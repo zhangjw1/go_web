@@ -36,7 +36,7 @@ func (ve ValidationErrors) Error() string {
 // New creates a new custom validator
 func New() *CustomValidator {
 	v := validator.New()
-	
+
 	// Register custom tag name function to use json tags
 	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
 		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
@@ -58,7 +58,7 @@ func New() *CustomValidator {
 func (cv *CustomValidator) ValidateStruct(obj interface{}) error {
 	if err := cv.validator.Struct(obj); err != nil {
 		var validationErrors ValidationErrors
-		
+
 		for _, err := range err.(validator.ValidationErrors) {
 			validationErrors = append(validationErrors, ValidationError{
 				Field:   err.Field(),
@@ -67,7 +67,7 @@ func (cv *CustomValidator) ValidateStruct(obj interface{}) error {
 				Message: getErrorMessage(err),
 			})
 		}
-		
+
 		return validationErrors
 	}
 	return nil
@@ -143,10 +143,10 @@ func getErrorMessage(fe validator.FieldError) string {
 func registerCustomValidators(v *validator.Validate) {
 	// Password validation
 	v.RegisterValidation("password", validatePassword)
-	
+
 	// Username validation
 	v.RegisterValidation("username", validateUsername)
-	
+
 	// Phone number validation
 	v.RegisterValidation("phone", validatePhone)
 }
@@ -154,12 +154,12 @@ func registerCustomValidators(v *validator.Validate) {
 // validatePassword validates password strength
 func validatePassword(fl validator.FieldLevel) bool {
 	password := fl.Field().String()
-	
+
 	// Minimum length check
 	if len(password) < 8 {
 		return false
 	}
-	
+
 	// Check for at least one uppercase letter
 	hasUpper := false
 	// Check for at least one lowercase letter
@@ -168,9 +168,9 @@ func validatePassword(fl validator.FieldLevel) bool {
 	hasDigit := false
 	// Check for at least one special character
 	hasSpecial := false
-	
+
 	specialChars := "!@#$%^&*()_+-=[]{}|;:,.<>?"
-	
+
 	for _, char := range password {
 		switch {
 		case char >= 'A' && char <= 'Z':
@@ -183,8 +183,8 @@ func validatePassword(fl validator.FieldLevel) bool {
 			hasSpecial = true
 		}
 	}
-	
-	// Require at least 3 out of 4 character types
+
+	// Require at least 2 out of 4 character types
 	count := 0
 	if hasUpper {
 		count++
@@ -198,64 +198,66 @@ func validatePassword(fl validator.FieldLevel) bool {
 	if hasSpecial {
 		count++
 	}
-	
-	return count >= 3
+
+	return count >= 2
 }
 
 // validateUsername validates username format
 func validateUsername(fl validator.FieldLevel) bool {
 	username := fl.Field().String()
-	
+
 	// Length check
 	if len(username) < 3 || len(username) > 30 {
 		return false
 	}
-	
+
 	// Must start with a letter
-	if username[0] < 'a' || (username[0] > 'z' && username[0] < 'A') || username[0] > 'Z' {
+	first := username[0]
+	isLetter := (first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z')
+	if !isLetter {
 		return false
 	}
-	
+
 	// Can only contain letters, numbers, underscores, and hyphens
 	for _, char := range username {
-		if !((char >= 'a' && char <= 'z') || 
-			 (char >= 'A' && char <= 'Z') || 
-			 (char >= '0' && char <= '9') || 
-			 char == '_' || char == '-') {
+		if !((char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '_' || char == '-') {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
 // validatePhone validates phone number format
 func validatePhone(fl validator.FieldLevel) bool {
 	phone := fl.Field().String()
-	
+
 	// Remove common separators
 	cleaned := strings.ReplaceAll(phone, " ", "")
 	cleaned = strings.ReplaceAll(cleaned, "-", "")
 	cleaned = strings.ReplaceAll(cleaned, "(", "")
 	cleaned = strings.ReplaceAll(cleaned, ")", "")
 	cleaned = strings.ReplaceAll(cleaned, ".", "")
-	
+
 	// Check if it starts with + (international format)
 	if strings.HasPrefix(cleaned, "+") {
 		cleaned = cleaned[1:]
 	}
-	
+
 	// Must be all digits and reasonable length
 	if len(cleaned) < 10 || len(cleaned) > 15 {
 		return false
 	}
-	
+
 	for _, char := range cleaned {
 		if char < '0' || char > '9' {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -270,7 +272,7 @@ func InitGinValidator() {
 			}
 			return name
 		})
-		
+
 		// Register custom validators
 		registerCustomValidators(v)
 	}

@@ -8,6 +8,18 @@ import (
 	"go-web-starter/internal/config"
 )
 
+// @title Go Web Starter API
+// @version 1.0
+// @description 这是 Go Web Starter 项目的 API 文档。
+// @contact.name API Support
+// @contact.url https://example.com
+// @contact.email support@example.com
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+// @host localhost:8080
+// @BasePath /
+// @schemes http
+
 func main() {
 	log.Println("Starting Go Web Starter application...")
 

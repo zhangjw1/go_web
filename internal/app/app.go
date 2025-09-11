@@ -14,6 +14,7 @@ import (
 	"go-web-starter/internal/config"
 	"go-web-starter/internal/handler"
 	"go-web-starter/internal/handler/routes"
+	"go-web-starter/internal/handler/validator"
 	"go-web-starter/internal/infrastructure/cache"
 	"go-web-starter/internal/infrastructure/database"
 	"go-web-starter/internal/infrastructure/logger"
@@ -190,6 +191,9 @@ func (a *App) initHTTPServer() error {
 
 	// Create Gin router
 	a.router = gin.New()
+
+	// Initialize custom validators for Gin binding (registers username/password/phone, etc.)
+	validator.InitGinValidator()
 
 	// Create route manager
 	healthHandler := handler.NewHealthHandler(a.config, a.logger, a.db, a.cache, a.msgSvc)

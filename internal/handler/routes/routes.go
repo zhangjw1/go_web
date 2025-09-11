@@ -5,8 +5,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"go-web-starter/internal/config"
+	docs "go-web-starter/internal/docs"
 	"go-web-starter/internal/handler"
 	"go-web-starter/internal/handler/middleware"
 	"go-web-starter/internal/infrastructure/logger"
@@ -152,28 +155,30 @@ func (rm *RouteManager) registerUserRoutes(v1 *gin.RouterGroup) {
 
 // registerDocumentationRoutes registers API documentation routes
 func (rm *RouteManager) registerDocumentationRoutes(router *gin.Engine) {
-	// TODO: Implement Swagger middleware
-	// router.Use(middleware.SwaggerRedirectMiddleware())
-
-	// Swagger documentation routes
-	docs := router.Group("/swagger")
-	{
-		// TODO: Apply conditional middleware (disable in production)
-		// docs.Use(middleware.ConditionalSwaggerMiddleware(rm.config, rm.logger))
-
-		// TODO: Swagger UI
-		// docs.GET("/*any", middleware.SwaggerMiddleware(rm.config, rm.logger))
-		docs.GET("/", func(c *gin.Context) {
-			c.JSON(200, gin.H{"message": "Swagger UI - Coming Soon"})
-		})
+	// 配置 Swagger 元信息（按需覆盖）
+	docs.SwaggerInfo.BasePath = "/"
+	// 动态设置 Host 与 Schemes，避免端口或协议不一致导致“Try it out”失败
+	docs.SwaggerInfo.Host = "localhost:" + rm.config.Server.Port
+	if rm.config.Server.Mode == "release" {
+		docs.SwaggerInfo.Schemes = []string{"https", "http"}
+	} else {
+		docs.SwaggerInfo.Schemes = []string{"http"}
 	}
 
-	// API documentation redirect
+	// Swagger UI 路由（为 swagger 放宽 CSP）
+	swaggerGroup := router.Group("/swagger")
+	swaggerGroup.Use(func(c *gin.Context) {
+		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'self';")
+		c.Next()
+	})
+	swaggerGroup.GET("/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	// /docs 重定向到 Swagger UI
 	router.GET("/docs", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "API Documentation - Coming Soon"})
+		c.Redirect(302, "/swagger/index.html")
 	})
 
-	rm.logger.Info("Documentation routes registered")
+	rm.logger.Info("Swagger documentation routes registered")
 }
 
 // registerStaticRoutes registers static file routes
