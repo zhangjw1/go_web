@@ -1,0 +1,36 @@
+server:
+  port: "8080"
+  mode: "release"
+  read_timeout: 60
+  write_timeout: 60
+
+database:
+  host: "${DB_HOST}"
+  port: 3306
+  username: "${DB_USERNAME}"
+  password: "${DB_PASSWORD}"
+  database: "${DB_NAME}"
+  charset: "utf8mb4"
+
+redis:
+  host: "${REDIS_HOST}"
+  port: 6379
+  password: "${REDIS_PASSWORD}"
+  database: 0
+
+kafka:
+  brokers:
+    - "${KAFKA_BROKER_1}"
+    - "${KAFKA_BROKER_2}"
+    - "${KAFKA_BROKER_3}"
+  group_id: "go-web-starter-prod"
+
+logger:
+  level: "info"
+  format: "json"
+  output: "file"
+  filename: "/var/log/go-web-starter/app.log"
+  max_size: 200
+  max_backups: 10
+  max_age: 30
+  compress: true
