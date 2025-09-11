@@ -32,7 +32,7 @@ func main() {
 	fmt.Println("\n=== Testing environment variable override ===")
 	os.Setenv("SERVER_PORT", "9090")
 	os.Setenv("DATABASE_HOST", "remote-db")
-	
+
 	envCfg, err := config.Load("")
 	if err != nil {
 		log.Fatal("Failed to load config with env vars:", err)

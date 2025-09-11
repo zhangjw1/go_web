@@ -36,7 +36,7 @@ func (r *BaseRepository[T]) getEntityName() string {
 // Create creates a new entity
 func (r *BaseRepository[T]) Create(ctx context.Context, entity T) error {
 	entityName := r.getEntityName()
-	
+
 	// Validate entity if it implements Validator interface
 	if validator, ok := any(entity).(model.Validator); ok {
 		if err := validator.Validate(); err != nil {
@@ -48,12 +48,12 @@ func (r *BaseRepository[T]) Create(ctx context.Context, entity T) error {
 	result := r.db.WithContext(ctx).Create(entity)
 	if result.Error != nil {
 		r.logger.WithError(result.Error).WithField("entity", entityName).Error("Failed to create entity")
-		
+
 		// Check for duplicate key error
 		if isDuplicateKeyError(result.Error) {
 			return repository.NewRepositoryError("create", entityName, 0, "entity already exists", result.Error)
 		}
-		
+
 		return repository.NewRepositoryError("create", entityName, 0, "database error", result.Error)
 	}
 
@@ -77,7 +77,7 @@ func (r *BaseRepository[T]) GetByID(ctx context.Context, id uint) (T, error) {
 			r.logger.WithField("entity", entityName).WithField("id", id).Debug("Entity not found")
 			return zero, repository.NewRepositoryError("get", entityName, id, "entity not found", result.Error)
 		}
-		
+
 		r.logger.WithError(result.Error).WithField("entity", entityName).WithField("id", id).Error("Failed to get entity")
 		return zero, repository.NewRepositoryError("get", entityName, id, "database error", result.Error)
 	}
@@ -176,10 +176,10 @@ func (r *BaseRepository[T]) List(ctx context.Context, params *model.QueryParams)
 
 	// Create a slice to hold the results
 	entities := r.createEntitySlice()
-	
+
 	// Build query
 	query := r.db.WithContext(ctx).Model(r.entity)
-	
+
 	// Apply search filter if provided
 	if params.Search != "" {
 		// This is a basic implementation - specific repositories should override this
@@ -206,7 +206,7 @@ func (r *BaseRepository[T]) List(ctx context.Context, params *model.QueryParams)
 
 	result := model.NewPaginationResult(&params.PaginationParams, total, entities)
 	r.logger.WithField("entity", entityName).WithField("total", total).WithField("page", params.Page).Debug("Entities listed successfully")
-	
+
 	return result, nil
 }
 
@@ -215,7 +215,7 @@ func (r *BaseRepository[T]) Count(ctx context.Context, filter interface{}) (int6
 	entityName := r.getEntityName()
 
 	query := r.db.WithContext(ctx).Model(r.entity)
-	
+
 	// Apply filter if provided
 	if filter != nil {
 		// This is a basic implementation - specific repositories should override this
@@ -268,22 +268,22 @@ func isDuplicateKeyError(err error) bool {
 	if err == nil {
 		return false
 	}
-	
+
 	errStr := err.Error()
 	// MySQL duplicate entry error
-	return contains(errStr, "Duplicate entry") || 
-		   contains(errStr, "duplicate key") ||
-		   contains(errStr, "UNIQUE constraint failed")
+	return contains(errStr, "Duplicate entry") ||
+		contains(errStr, "duplicate key") ||
+		contains(errStr, "UNIQUE constraint failed")
 }
 
 // contains checks if a string contains a substring (case-insensitive)
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && 
-		   (s == substr || 
-		    len(s) > len(substr) && 
-		    (s[:len(substr)] == substr || 
-		     s[len(s)-len(substr):] == substr || 
-		     containsSubstring(s, substr)))
+	return len(s) >= len(substr) &&
+		(s == substr ||
+			len(s) > len(substr) &&
+				(s[:len(substr)] == substr ||
+					s[len(s)-len(substr):] == substr ||
+					containsSubstring(s, substr)))
 }
 
 // containsSubstring checks if string contains substring

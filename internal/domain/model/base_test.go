@@ -21,13 +21,13 @@ func TestBaseModel(t *testing.T) {
 
 func TestBaseModelBeforeCreate(t *testing.T) {
 	model := &BaseModel{}
-	
+
 	// Mock GORM DB (we don't actually need it for this test)
 	var db *gorm.DB
-	
+
 	err := model.BeforeCreate(db)
 	assert.NoError(t, err)
-	
+
 	// Check that timestamps were set
 	assert.False(t, model.CreatedAt.IsZero())
 	assert.False(t, model.UpdatedAt.IsZero())
@@ -36,21 +36,21 @@ func TestBaseModelBeforeCreate(t *testing.T) {
 
 func TestBaseModelBeforeUpdate(t *testing.T) {
 	model := &BaseModel{}
-	
+
 	// Set initial timestamps
 	initialTime := time.Now().Add(-1 * time.Hour)
 	model.CreatedAt = initialTime
 	model.UpdatedAt = initialTime
-	
+
 	// Mock GORM DB
 	var db *gorm.DB
-	
+
 	// Wait a bit to ensure different timestamp
 	time.Sleep(1 * time.Millisecond)
-	
+
 	err := model.BeforeUpdate(db)
 	assert.NoError(t, err)
-	
+
 	// Check that only UpdatedAt was changed
 	assert.Equal(t, initialTime, model.CreatedAt)
 	assert.True(t, model.UpdatedAt.After(initialTime))
@@ -58,18 +58,18 @@ func TestBaseModelBeforeUpdate(t *testing.T) {
 
 func TestBaseModelSoftDelete(t *testing.T) {
 	model := &BaseModel{}
-	
+
 	// Initially not deleted
 	assert.False(t, model.IsDeleted())
 	assert.Nil(t, model.GetDeletedAt())
-	
+
 	// Simulate soft delete
 	now := time.Now()
 	model.DeletedAt = gorm.DeletedAt{
 		Time:  now,
 		Valid: true,
 	}
-	
+
 	// Check soft delete state
 	assert.True(t, model.IsDeleted())
 	assert.NotNil(t, model.GetDeletedAt())
@@ -85,32 +85,32 @@ func TestPaginationParams(t *testing.T) {
 		limit    int
 	}{
 		{
-			name:   "valid params",
-			params: PaginationParams{Page: 2, PageSize: 10},
+			name:     "valid params",
+			params:   PaginationParams{Page: 2, PageSize: 10},
 			expected: PaginationParams{Page: 2, PageSize: 10},
-			offset: 10,
-			limit:  10,
+			offset:   10,
+			limit:    10,
 		},
 		{
-			name:   "zero values",
-			params: PaginationParams{Page: 0, PageSize: 0},
+			name:     "zero values",
+			params:   PaginationParams{Page: 0, PageSize: 0},
 			expected: PaginationParams{Page: 1, PageSize: 10},
-			offset: 0,
-			limit:  10,
+			offset:   0,
+			limit:    10,
 		},
 		{
-			name:   "negative values",
-			params: PaginationParams{Page: -1, PageSize: -5},
+			name:     "negative values",
+			params:   PaginationParams{Page: -1, PageSize: -5},
 			expected: PaginationParams{Page: 1, PageSize: 10},
-			offset: 0,
-			limit:  10,
+			offset:   0,
+			limit:    10,
 		},
 		{
-			name:   "page size too large",
-			params: PaginationParams{Page: 1, PageSize: 200},
+			name:     "page size too large",
+			params:   PaginationParams{Page: 1, PageSize: 200},
 			expected: PaginationParams{Page: 1, PageSize: 100},
-			offset: 0,
-			limit:  100,
+			offset:   0,
+			limit:    100,
 		},
 	}
 
@@ -118,7 +118,7 @@ func TestPaginationParams(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			params := tt.params
 			params.SetDefaults()
-			
+
 			assert.Equal(t, tt.expected.Page, params.Page)
 			assert.Equal(t, tt.expected.PageSize, params.PageSize)
 			assert.Equal(t, tt.offset, params.GetOffset())
@@ -145,48 +145,48 @@ func TestPaginationResult(t *testing.T) {
 
 func TestPaginationResultEdgeCases(t *testing.T) {
 	tests := []struct {
-		name      string
-		page      int
-		pageSize  int
-		total     int64
-		hasNext   bool
-		hasPrev   bool
+		name       string
+		page       int
+		pageSize   int
+		total      int64
+		hasNext    bool
+		hasPrev    bool
 		totalPages int
 	}{
 		{
-			name:      "first page",
-			page:      1,
-			pageSize:  10,
-			total:     25,
-			hasNext:   true,
-			hasPrev:   false,
+			name:       "first page",
+			page:       1,
+			pageSize:   10,
+			total:      25,
+			hasNext:    true,
+			hasPrev:    false,
 			totalPages: 3,
 		},
 		{
-			name:      "last page",
-			page:      3,
-			pageSize:  10,
-			total:     25,
-			hasNext:   false,
-			hasPrev:   true,
+			name:       "last page",
+			page:       3,
+			pageSize:   10,
+			total:      25,
+			hasNext:    false,
+			hasPrev:    true,
 			totalPages: 3,
 		},
 		{
-			name:      "single page",
-			page:      1,
-			pageSize:  10,
-			total:     5,
-			hasNext:   false,
-			hasPrev:   false,
+			name:       "single page",
+			page:       1,
+			pageSize:   10,
+			total:      5,
+			hasNext:    false,
+			hasPrev:    false,
 			totalPages: 1,
 		},
 		{
-			name:      "empty result",
-			page:      1,
-			pageSize:  10,
-			total:     0,
-			hasNext:   false,
-			hasPrev:   false,
+			name:       "empty result",
+			page:       1,
+			pageSize:   10,
+			total:      0,
+			hasNext:    false,
+			hasPrev:    false,
 			totalPages: 0,
 		},
 	}

@@ -211,9 +211,9 @@ func TestUserStatusMethods(t *testing.T) {
 
 func TestUserGetFullName(t *testing.T) {
 	tests := []struct {
-		name      string
-		user      User
-		expected  string
+		name     string
+		user     User
+		expected string
 	}{
 		{
 			name: "both first and last name",
@@ -334,10 +334,10 @@ func TestProfileValidation(t *testing.T) {
 		{
 			name: "valid profile",
 			profile: Profile{
-				UserID: 1,
-				Phone:  "+1234567890",
+				UserID:  1,
+				Phone:   "+1234567890",
 				Website: "https://example.com",
-				Gender: "male",
+				Gender:  "male",
 			},
 			wantErr: false,
 		},

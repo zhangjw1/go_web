@@ -202,7 +202,7 @@ func main() {
 	// Example 10: Test profile methods
 	fmt.Println("\n=== Testing Profile Methods ===")
 	fmt.Printf("Profile display name: %s\n", newProfile.GetDisplayName())
-	
+
 	// Set date of birth and calculate age
 	// birthDate := time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
 	// newProfile.DateOfBirth = &birthDate

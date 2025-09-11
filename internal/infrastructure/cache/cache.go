@@ -23,25 +23,25 @@ type CacheService interface {
 	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error
 	Delete(ctx context.Context, keys ...string) error
 	Exists(ctx context.Context, keys ...string) (int64, error)
-	
+
 	// JSON operations
 	GetJSON(ctx context.Context, key string, dest interface{}) error
 	SetJSON(ctx context.Context, key string, value interface{}, expiration time.Duration) error
-	
+
 	// Advanced operations
 	Expire(ctx context.Context, key string, expiration time.Duration) error
 	TTL(ctx context.Context, key string) (time.Duration, error)
 	Increment(ctx context.Context, key string) (int64, error)
 	IncrementBy(ctx context.Context, key string, value int64) (int64, error)
-	
+
 	// Atomic operations
 	SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) (bool, error)
 	GetSet(ctx context.Context, key string, value interface{}) (string, error)
-	
+
 	// Batch operations
 	MGet(ctx context.Context, keys ...string) ([]interface{}, error)
 	MSet(ctx context.Context, pairs ...interface{}) error
-	
+
 	// Utility operations
 	FlushDB(ctx context.Context) error
 	Ping(ctx context.Context) error
@@ -133,16 +133,16 @@ func (r *RedisCacheService) GetJSON(ctx context.Context, key string, dest interf
 	if dest == nil {
 		return ErrInvalidValue
 	}
-	
+
 	data, err := r.client.Get(ctx, key)
 	if err != nil {
 		return err
 	}
-	
+
 	if err := json.Unmarshal([]byte(data), dest); err != nil {
 		return fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -154,12 +154,12 @@ func (r *RedisCacheService) SetJSON(ctx context.Context, key string, value inter
 	if value == nil {
 		return ErrInvalidValue
 	}
-	
+
 	data, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	
+
 	return r.client.Set(ctx, key, data, expiration)
 }
 

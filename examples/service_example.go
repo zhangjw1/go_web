@@ -20,7 +20,7 @@ func main() {
 		Format: "text",
 		Output: "stdout",
 	}
-	
+
 	appLogger, err := logger.New(loggerConfig)
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
@@ -34,7 +34,7 @@ func main() {
 		Password: "",
 		Database: 0,
 	}
-	
+
 	cacheManager, err = cache.NewManager(redisConfig, appLogger)
 	if err != nil {
 		fmt.Printf("Warning: Failed to create cache manager: %v\n", err)
@@ -52,7 +52,7 @@ func main() {
 		Brokers: []string{"localhost:9092"},
 		GroupID: "go-web-starter-example",
 	}
-	
+
 	messagingManager, err = messaging.NewManager(kafkaConfig, appLogger)
 	if err != nil {
 		fmt.Printf("Warning: Failed to create messaging manager: %v\n", err)
@@ -147,15 +147,15 @@ func testServiceValidation() {
 	fmt.Println("\nTesting ListUsersRequest validation...")
 
 	listRequest := &service.ListUsersRequest{
-		Page:    0,    // Invalid page
-		PerPage: 200,  // Too large per page
+		Page:    0,   // Invalid page
+		PerPage: 200, // Too large per page
 	}
 
 	err = service.ValidateListUsersRequest(listRequest)
 	if err != nil {
 		fmt.Printf("❌ List request validation failed: %v\n", err)
 	} else {
-		fmt.Printf("✅ List request validation passed (corrected values: page=%d, per_page=%d)\n", 
+		fmt.Printf("✅ List request validation passed (corrected values: page=%d, per_page=%d)\n",
 			listRequest.Page, listRequest.PerPage)
 	}
 }

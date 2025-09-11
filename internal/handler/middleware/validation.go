@@ -165,18 +165,18 @@ func isJSONSyntaxError(err error) bool {
 	// Check for common JSON syntax error patterns
 	errStr := err.Error()
 	return contains(errStr, "invalid character") ||
-		   contains(errStr, "unexpected end of JSON input") ||
-		   contains(errStr, "cannot unmarshal")
+		contains(errStr, "unexpected end of JSON input") ||
+		contains(errStr, "cannot unmarshal")
 }
 
 // contains checks if a string contains a substring (case-insensitive)
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && 
-		   (s == substr || 
-		    (len(s) > len(substr) && 
-		     (s[:len(substr)] == substr || 
-		      s[len(s)-len(substr):] == substr || 
-		      indexOfSubstring(s, substr) >= 0)))
+	return len(s) >= len(substr) &&
+		(s == substr ||
+			(len(s) > len(substr) &&
+				(s[:len(substr)] == substr ||
+					s[len(s)-len(substr):] == substr ||
+					indexOfSubstring(s, substr) >= 0)))
 }
 
 // indexOfSubstring finds the index of substring in string
@@ -205,12 +205,12 @@ func WithValidation[T any](handler func(*gin.Context, *T)) gin.HandlerFunc {
 		if !ValidateJSON(c, &req) {
 			return
 		}
-		
+
 		// Additional struct validation
 		if !ValidateStruct(c, &req) {
 			return
 		}
-		
+
 		handler(c, &req)
 	}
 }
@@ -222,12 +222,12 @@ func WithQueryValidation[T any](handler func(*gin.Context, *T)) gin.HandlerFunc 
 		if !ValidateQuery(c, &req) {
 			return
 		}
-		
+
 		// Additional struct validation
 		if !ValidateStruct(c, &req) {
 			return
 		}
-		
+
 		handler(c, &req)
 	}
 }

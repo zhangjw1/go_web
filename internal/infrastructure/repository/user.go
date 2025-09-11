@@ -39,7 +39,7 @@ func (r *UserRepositoryImpl) GetByUsername(ctx context.Context, username string)
 			r.logger.WithField("username", username).Debug("User not found by username")
 			return nil, repository.NewRepositoryError("get_by_username", "User", 0, "entity not found", result.Error)
 		}
-		
+
 		r.logger.WithError(result.Error).WithField("username", username).Error("Failed to get user by username")
 		return nil, repository.NewRepositoryError("get_by_username", "User", 0, "database error", result.Error)
 	}
@@ -60,7 +60,7 @@ func (r *UserRepositoryImpl) GetByEmail(ctx context.Context, email string) (*mod
 			r.logger.WithField("email", email).Debug("User not found by email")
 			return nil, repository.NewRepositoryError("get_by_email", "User", 0, "entity not found", result.Error)
 		}
-		
+
 		r.logger.WithError(result.Error).WithField("email", email).Error("Failed to get user by email")
 		return nil, repository.NewRepositoryError("get_by_email", "User", 0, "database error", result.Error)
 	}
@@ -81,7 +81,7 @@ func (r *UserRepositoryImpl) GetWithProfile(ctx context.Context, id uint) (*mode
 			r.logger.WithField("id", id).Debug("User not found")
 			return nil, repository.NewRepositoryError("get_with_profile", "User", id, "entity not found", result.Error)
 		}
-		
+
 		r.logger.WithError(result.Error).WithField("id", id).Error("Failed to get user with profile")
 		return nil, repository.NewRepositoryError("get_with_profile", "User", id, "database error", result.Error)
 	}
@@ -98,7 +98,7 @@ func (r *UserRepositoryImpl) ListWithProfiles(ctx context.Context, params *model
 
 	// Build query
 	query := r.db.WithContext(ctx).Model(&model.User{}).Preload("Profile")
-	
+
 	// Apply filters
 	query = r.applyUserFilters(query, &params.UserFilter)
 
@@ -128,7 +128,7 @@ func (r *UserRepositoryImpl) ListWithProfiles(ctx context.Context, params *model
 
 	result := model.NewPaginationResult(&params.PaginationParams, total, userPtrs)
 	r.logger.WithField("total", total).WithField("page", params.Page).Debug("Users with profiles listed successfully")
-	
+
 	return result, nil
 }
 
@@ -249,7 +249,7 @@ func (r *UserRepositoryImpl) GetActiveUsers(ctx context.Context, params *model.P
 
 	result := model.NewPaginationResult(params, total, userPtrs)
 	r.logger.WithField("total", total).WithField("page", params.Page).Debug("Active users retrieved successfully")
-	
+
 	return result, nil
 }
 
@@ -265,7 +265,7 @@ func (r *UserRepositoryImpl) SearchUsers(ctx context.Context, query string, para
 	}
 
 	searchPattern := "%" + strings.ToLower(query) + "%"
-	
+
 	// Build search query
 	dbQuery := r.db.WithContext(ctx).Model(&model.User{}).Where(
 		"LOWER(username) LIKE ? OR LOWER(email) LIKE ? OR LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ?",
@@ -297,7 +297,7 @@ func (r *UserRepositoryImpl) SearchUsers(ctx context.Context, query string, para
 
 	result := model.NewPaginationResult(params, total, userPtrs)
 	r.logger.WithField("query", query).WithField("total", total).WithField("page", params.Page).Debug("User search completed successfully")
-	
+
 	return result, nil
 }
 
@@ -310,7 +310,7 @@ func (r *UserRepositoryImpl) List(ctx context.Context, params *model.QueryParams
 
 	// Build query
 	query := r.db.WithContext(ctx).Model(&model.User{})
-	
+
 	// Apply search filter
 	if params.Search != "" {
 		searchPattern := "%" + strings.ToLower(params.Search) + "%"
@@ -346,7 +346,7 @@ func (r *UserRepositoryImpl) List(ctx context.Context, params *model.QueryParams
 
 	result := model.NewPaginationResult(&params.PaginationParams, total, userPtrs)
 	r.logger.WithField("total", total).WithField("page", params.Page).Debug("Users listed successfully")
-	
+
 	return result, nil
 }
 

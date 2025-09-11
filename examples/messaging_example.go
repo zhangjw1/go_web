@@ -21,7 +21,7 @@ func main() {
 		Format: "text",
 		Output: "stdout",
 	}
-	
+
 	appLogger, err := logger.New(loggerConfig)
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
@@ -75,7 +75,7 @@ func startConsumers(ctx context.Context, manager *messaging.Manager, logger *log
 	// Start user event consumer
 	userHandler := messaging.MessageHandlerFunc(func(ctx context.Context, message *messaging.Message) error {
 		logger.WithField("topic", message.Topic).Info("Processing user event")
-		
+
 		var envelope messaging.EnvelopedMessage
 		if err := message.GetValueAsJSON(&envelope); err != nil {
 			logger.WithError(err).Error("Failed to parse enveloped message")
@@ -83,7 +83,7 @@ func startConsumers(ctx context.Context, manager *messaging.Manager, logger *log
 		}
 
 		logger.WithField("event_type", envelope.Metadata.EventType).WithField("source", envelope.Metadata.Source).Info("User event received")
-		
+
 		// Process based on event type
 		switch envelope.Metadata.EventType {
 		case messaging.EventUserCreated:
@@ -115,7 +115,7 @@ func startConsumers(ctx context.Context, manager *messaging.Manager, logger *log
 	// Start system event consumer
 	systemHandler := messaging.MessageHandlerFunc(func(ctx context.Context, message *messaging.Message) error {
 		logger.WithField("topic", message.Topic).Info("Processing system event")
-		
+
 		var envelope messaging.EnvelopedMessage
 		if err := message.GetValueAsJSON(&envelope); err != nil {
 			logger.WithError(err).Error("Failed to parse enveloped message")
@@ -135,7 +135,7 @@ func startConsumers(ctx context.Context, manager *messaging.Manager, logger *log
 	// Start notification consumer
 	notificationHandler := messaging.MessageHandlerFunc(func(ctx context.Context, message *messaging.Message) error {
 		logger.WithField("topic", message.Topic).Info("Processing notification event")
-		
+
 		var envelope messaging.EnvelopedMessage
 		if err := message.GetValueAsJSON(&envelope); err != nil {
 			logger.WithError(err).Error("Failed to parse enveloped message")
@@ -143,7 +143,7 @@ func startConsumers(ctx context.Context, manager *messaging.Manager, logger *log
 		}
 
 		logger.WithField("event_type", envelope.Metadata.EventType).WithField("source", envelope.Metadata.Source).Info("Notification event received")
-		
+
 		// Process notification
 		switch envelope.Metadata.EventType {
 		case messaging.EventEmailNotification:
@@ -164,7 +164,7 @@ func startConsumers(ctx context.Context, manager *messaging.Manager, logger *log
 	// Start audit event consumer
 	auditHandler := messaging.MessageHandlerFunc(func(ctx context.Context, message *messaging.Message) error {
 		logger.WithField("topic", message.Topic).Info("Processing audit event")
-		
+
 		var envelope messaging.EnvelopedMessage
 		if err := message.GetValueAsJSON(&envelope); err != nil {
 			logger.WithError(err).Error("Failed to parse enveloped message")
@@ -185,7 +185,7 @@ func startConsumers(ctx context.Context, manager *messaging.Manager, logger *log
 func testMessagePublishing(ctx context.Context, manager *messaging.Manager) {
 	// Test user events
 	fmt.Println("Publishing user events...")
-	
+
 	userData := map[string]interface{}{
 		"username": "john_doe",
 		"email":    "john@example.com",
@@ -220,7 +220,7 @@ func testMessagePublishing(ctx context.Context, manager *messaging.Manager) {
 
 	// Test system events
 	fmt.Println("\nPublishing system events...")
-	
+
 	serviceData := map[string]interface{}{
 		"version":     "1.0.0",
 		"environment": "development",

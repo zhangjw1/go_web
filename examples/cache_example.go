@@ -18,7 +18,7 @@ func main() {
 		Format: "text",
 		Output: "stdout",
 	}
-	
+
 	appLogger, err := logger.New(loggerConfig)
 	if err != nil {
 		log.Fatal("Failed to create logger:", err)
@@ -219,7 +219,7 @@ func testRateLimiting(ctx context.Context, manager *cache.Manager) {
 		}
 
 		fmt.Printf("Request %d: %s (remaining: %d)\n", i, status, remaining)
-		
+
 		// Small delay between requests
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -246,11 +246,11 @@ func testDistributedLocks(ctx context.Context, manager *cache.Manager) {
 
 	if acquired {
 		fmt.Println("✓ Lock acquired successfully")
-		
+
 		// Simulate work
 		fmt.Println("  Doing critical work...")
 		time.Sleep(1 * time.Second)
-		
+
 		// Release lock
 		err = manager.ReleaseLock(ctx, resource)
 		if err != nil {

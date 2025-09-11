@@ -101,7 +101,7 @@ func TestCORSMiddlewareWithConfig(t *testing.T) {
 
 func TestDefaultCORSConfig(t *testing.T) {
 	config := DefaultCORSConfig()
-	
+
 	assert.NotNil(t, config)
 	assert.True(t, len(config.AllowedOrigins) > 0)
 	assert.True(t, len(config.AllowedMethods) > 0)

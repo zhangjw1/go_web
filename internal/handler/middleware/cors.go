@@ -11,7 +11,7 @@ import (
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		
+
 		// Set CORS headers
 		c.Header("Access-Control-Allow-Origin", getAllowedOrigin(origin))
 		c.Header("Access-Control-Allow-Credentials", "true")
@@ -50,7 +50,7 @@ func getAllowedOrigin(origin string) string {
 	if len(allowedOrigins) > 0 {
 		return allowedOrigins[0]
 	}
-	
+
 	return "*"
 }
 
@@ -104,7 +104,7 @@ func CORSMiddlewareWithConfig(config *CORSConfig) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		
+
 		// Check if origin is allowed
 		allowedOrigin := "*"
 		if len(config.AllowedOrigins) > 0 {
@@ -123,7 +123,7 @@ func CORSMiddlewareWithConfig(config *CORSConfig) gin.HandlerFunc {
 
 		// Set CORS headers
 		c.Header("Access-Control-Allow-Origin", allowedOrigin)
-		
+
 		if config.AllowCredentials {
 			c.Header("Access-Control-Allow-Credentials", "true")
 		}

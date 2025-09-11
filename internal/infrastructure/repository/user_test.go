@@ -33,7 +33,7 @@ func TestUserRepository(t *testing.T) {
 	t.Run("NewUserRepository", func(t *testing.T) {
 		userRepo := NewUserRepository(nil, log)
 		assert.NotNil(t, userRepo)
-		
+
 		// Verify it implements the interface
 		var _ repository.UserRepository = userRepo
 	})
@@ -109,75 +109,75 @@ func TestUserRepositoryWithDatabase(t *testing.T) {
 
 	// Example of what the test would look like:
 	/*
-	// Create test database connection
-	dbConfig := &config.DatabaseConfig{
-		Host:            "localhost",
-		Port:            3306,
-		Username:        "test",
-		Password:        "test",
-		Database:        "test_user_repo_db",
-		LogLevel:        "error",
-		MaxIdleConns:    5,
-		MaxOpenConns:    10,
-		ConnMaxLifetime: 30,
-	}
-
-	log, _ := logger.New(loggerConfig)
-	db, err := database.New(dbConfig, log)
-	require.NoError(t, err)
-	defer db.Close()
-
-	// Run migrations
-	migrationManager := database.NewMigrationManager(db.DB, log)
-	err = migrationManager.MigrateAll()
-	require.NoError(t, err)
-
-	userRepo := NewUserRepository(db.DB, log)
-	ctx := context.Background()
-
-	t.Run("Create and Get User", func(t *testing.T) {
-		user := &model.User{
-			Username:  "testuser",
-			Email:     "test@example.com",
-			Password:  "password123",
-			FirstName: "Test",
-			LastName:  "User",
-			Status:    model.UserStatusActive,
+		// Create test database connection
+		dbConfig := &config.DatabaseConfig{
+			Host:            "localhost",
+			Port:            3306,
+			Username:        "test",
+			Password:        "test",
+			Database:        "test_user_repo_db",
+			LogLevel:        "error",
+			MaxIdleConns:    5,
+			MaxOpenConns:    10,
+			ConnMaxLifetime: 30,
 		}
 
-		// Create user
-		err := userRepo.Create(ctx, user)
-		assert.NoError(t, err)
-		assert.NotZero(t, user.ID)
+		log, _ := logger.New(loggerConfig)
+		db, err := database.New(dbConfig, log)
+		require.NoError(t, err)
+		defer db.Close()
 
-		// Get user by ID
-		foundUser, err := userRepo.GetByID(ctx, user.ID)
-		assert.NoError(t, err)
-		assert.Equal(t, user.Username, foundUser.Username)
-		assert.Equal(t, user.Email, foundUser.Email)
+		// Run migrations
+		migrationManager := database.NewMigrationManager(db.DB, log)
+		err = migrationManager.MigrateAll()
+		require.NoError(t, err)
 
-		// Get user by username
-		foundUser, err = userRepo.GetByUsername(ctx, user.Username)
-		assert.NoError(t, err)
-		assert.Equal(t, user.ID, foundUser.ID)
+		userRepo := NewUserRepository(db.DB, log)
+		ctx := context.Background()
 
-		// Get user by email
-		foundUser, err = userRepo.GetByEmail(ctx, user.Email)
-		assert.NoError(t, err)
-		assert.Equal(t, user.ID, foundUser.ID)
-	})
+		t.Run("Create and Get User", func(t *testing.T) {
+			user := &model.User{
+				Username:  "testuser",
+				Email:     "test@example.com",
+				Password:  "password123",
+				FirstName: "Test",
+				LastName:  "User",
+				Status:    model.UserStatusActive,
+			}
 
-	t.Run("Update User", func(t *testing.T) {
-		// ... test update operations
-	})
+			// Create user
+			err := userRepo.Create(ctx, user)
+			assert.NoError(t, err)
+			assert.NotZero(t, user.ID)
 
-	t.Run("Delete User", func(t *testing.T) {
-		// ... test delete operations
-	})
+			// Get user by ID
+			foundUser, err := userRepo.GetByID(ctx, user.ID)
+			assert.NoError(t, err)
+			assert.Equal(t, user.Username, foundUser.Username)
+			assert.Equal(t, user.Email, foundUser.Email)
 
-	t.Run("List Users", func(t *testing.T) {
-		// ... test list operations
-	})
+			// Get user by username
+			foundUser, err = userRepo.GetByUsername(ctx, user.Username)
+			assert.NoError(t, err)
+			assert.Equal(t, user.ID, foundUser.ID)
+
+			// Get user by email
+			foundUser, err = userRepo.GetByEmail(ctx, user.Email)
+			assert.NoError(t, err)
+			assert.Equal(t, user.ID, foundUser.ID)
+		})
+
+		t.Run("Update User", func(t *testing.T) {
+			// ... test update operations
+		})
+
+		t.Run("Delete User", func(t *testing.T) {
+			// ... test delete operations
+		})
+
+		t.Run("List Users", func(t *testing.T) {
+			// ... test list operations
+		})
 	*/
 }
 

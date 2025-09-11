@@ -9,8 +9,6 @@ import (
 	"go-web-starter/internal/infrastructure/logger"
 )
 
-
-
 // LoggerMiddleware creates a logging middleware for Gin
 func LoggerMiddleware(logger *logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -45,4 +43,3 @@ func LoggerMiddleware(logger *logger.Logger) gin.HandlerFunc {
 		}
 	}
 }
-

@@ -38,30 +38,30 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 
 // SecurityConfig represents security headers configuration
 type SecurityConfig struct {
-	ContentTypeOptions    string
-	FrameOptions          string
-	XSSProtection         string
-	ReferrerPolicy        string
-	ContentSecurityPolicy string
+	ContentTypeOptions      string
+	FrameOptions            string
+	XSSProtection           string
+	ReferrerPolicy          string
+	ContentSecurityPolicy   string
 	StrictTransportSecurity string
-	PermissionsPolicy     string
-	HSTSMaxAge            int
-	HSTSIncludeSubdomains bool
-	HSTSPreload           bool
+	PermissionsPolicy       string
+	HSTSMaxAge              int
+	HSTSIncludeSubdomains   bool
+	HSTSPreload             bool
 }
 
 // DefaultSecurityConfig returns default security configuration
 func DefaultSecurityConfig() *SecurityConfig {
 	return &SecurityConfig{
-		ContentTypeOptions:      "nosniff",
-		FrameOptions:           "DENY",
-		XSSProtection:          "1; mode=block",
-		ReferrerPolicy:         "strict-origin-when-cross-origin",
-		ContentSecurityPolicy:  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; media-src 'self'; object-src 'none'; child-src 'none'; frame-src 'none'; worker-src 'none'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; manifest-src 'self'",
-		PermissionsPolicy:      "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-		HSTSMaxAge:             31536000, // 1 year
-		HSTSIncludeSubdomains:  true,
-		HSTSPreload:            true,
+		ContentTypeOptions:    "nosniff",
+		FrameOptions:          "DENY",
+		XSSProtection:         "1; mode=block",
+		ReferrerPolicy:        "strict-origin-when-cross-origin",
+		ContentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; media-src 'self'; object-src 'none'; child-src 'none'; frame-src 'none'; worker-src 'none'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; manifest-src 'self'",
+		PermissionsPolicy:     "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+		HSTSMaxAge:            31536000, // 1 year
+		HSTSIncludeSubdomains: true,
+		HSTSPreload:           true,
 	}
 }
 

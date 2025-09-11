@@ -123,13 +123,13 @@ func TestRedisCacheService_Get(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := &MockRedisClient{}
 			service := NewRedisCacheService(mockClient)
-			
+
 			if !tt.wantErr {
 				mockClient.On("Get", mock.Anything, tt.key).Return("test-value", nil)
 			}
-			
+
 			_, err := service.Get(context.Background(), tt.key)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errType != nil {
@@ -177,13 +177,13 @@ func TestRedisCacheService_Set(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := &MockRedisClient{}
 			service := NewRedisCacheService(mockClient)
-			
+
 			if !tt.wantErr {
 				mockClient.On("Set", mock.Anything, tt.key, tt.value, mock.AnythingOfType("time.Duration")).Return(nil)
 			}
-			
+
 			err := service.Set(context.Background(), tt.key, tt.value, time.Minute)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errType != nil {
@@ -199,7 +199,7 @@ func TestRedisCacheService_Set(t *testing.T) {
 
 func TestKeyManager_UserKey(t *testing.T) {
 	km := NewKeyManager("test-app")
-	
+
 	tests := []struct {
 		name   string
 		userID interface{}
@@ -227,7 +227,7 @@ func TestKeyManager_UserKey(t *testing.T) {
 
 func TestKeyManager_ValidateKey(t *testing.T) {
 	km := NewKeyManager("test-app")
-	
+
 	tests := []struct {
 		name    string
 		key     string
@@ -269,7 +269,7 @@ func TestKeyManager_ValidateKey(t *testing.T) {
 
 func TestKeyManager_GetKeyTTL(t *testing.T) {
 	km := NewKeyManager("test-app")
-	
+
 	tests := []struct {
 		name    string
 		keyType string

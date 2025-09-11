@@ -148,7 +148,7 @@ type PaginationResult struct {
 // NewPaginationResult creates a new pagination result
 func NewPaginationResult(params *PaginationParams, total int64, data interface{}) *PaginationResult {
 	totalPages := int((total + int64(params.PageSize) - 1) / int64(params.PageSize))
-	
+
 	return &PaginationResult{
 		Page:       params.Page,
 		PageSize:   params.PageSize,
@@ -171,12 +171,12 @@ func (s *SortParams) GetOrderBy() string {
 	if s.SortBy == "" {
 		return "id desc" // Default sorting
 	}
-	
+
 	order := "asc"
 	if s.SortOrder == "desc" {
 		order = "desc"
 	}
-	
+
 	return s.SortBy + " " + order
 }
 
@@ -198,8 +198,8 @@ func (s *SortParams) SetDefaults() {
 
 // FilterParams represents common filter parameters
 type FilterParams struct {
-	Search    string    `json:"search" form:"search"`
-	Status    string    `json:"status" form:"status"`
+	Search    string     `json:"search" form:"search"`
+	Status    string     `json:"status" form:"status"`
 	CreatedAt *TimeRange `json:"created_at" form:"created_at"`
 	UpdatedAt *TimeRange `json:"updated_at" form:"updated_at"`
 }

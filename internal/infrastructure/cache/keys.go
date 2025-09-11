@@ -48,7 +48,7 @@ func (km *KeyManager) UserTokenKey(tokenID string) string {
 // UserListKey generates a cache key for user list with pagination
 func (km *KeyManager) UserListKey(page, perPage int, filters map[string]interface{}) string {
 	parts := []interface{}{"users", "list", fmt.Sprintf("page_%d", page), fmt.Sprintf("per_page_%d", perPage)}
-	
+
 	// Add filters to key
 	if len(filters) > 0 {
 		var filterParts []string
@@ -57,7 +57,7 @@ func (km *KeyManager) UserListKey(page, perPage int, filters map[string]interfac
 		}
 		parts = append(parts, strings.Join(filterParts, "_"))
 	}
-	
+
 	return km.buildKey(parts...)
 }
 
@@ -95,17 +95,17 @@ func (km *KeyManager) HealthCheckKey(service string) string {
 // buildKey constructs a cache key from parts
 func (km *KeyManager) buildKey(parts ...interface{}) string {
 	var keyParts []string
-	
+
 	// Add prefix if set
 	if km.prefix != "" {
 		keyParts = append(keyParts, km.prefix)
 	}
-	
+
 	// Add all parts
 	for _, part := range parts {
 		keyParts = append(keyParts, fmt.Sprintf("%v", part))
 	}
-	
+
 	return strings.Join(keyParts, km.separator)
 }
 
@@ -132,7 +132,7 @@ func (km *KeyManager) ValidateKey(key string) error {
 	if key == "" {
 		return ErrInvalidKey
 	}
-	
+
 	// Check for invalid characters
 	invalidChars := []string{" ", "\t", "\n", "\r"}
 	for _, char := range invalidChars {
@@ -140,12 +140,12 @@ func (km *KeyManager) ValidateKey(key string) error {
 			return fmt.Errorf("key contains invalid character: %s", char)
 		}
 	}
-	
+
 	// Check key length (Redis has a limit of 512MB, but we'll use a reasonable limit)
 	if len(key) > 250 {
 		return fmt.Errorf("key too long: %d characters (max 250)", len(key))
 	}
-	
+
 	return nil
 }
 
@@ -160,13 +160,13 @@ func (km *KeyManager) IsUserKey(key string) bool {
 	if len(parts) < 2 {
 		return false
 	}
-	
+
 	// Skip prefix if present
 	startIndex := 0
 	if km.prefix != "" && len(parts) > 0 && parts[0] == km.prefix {
 		startIndex = 1
 	}
-	
+
 	return len(parts) > startIndex && parts[startIndex] == "user"
 }
 
@@ -176,13 +176,13 @@ func (km *KeyManager) IsSessionKey(key string) bool {
 	if len(parts) < 2 {
 		return false
 	}
-	
+
 	// Skip prefix if present
 	startIndex := 0
 	if km.prefix != "" && len(parts) > 0 && parts[0] == km.prefix {
 		startIndex = 1
 	}
-	
+
 	return len(parts) > startIndex && parts[startIndex] == "session"
 }
 
@@ -218,16 +218,16 @@ func (km *KeyManager) GetKeyTypeFromKey(key string) string {
 	if len(parts) < 2 {
 		return "unknown"
 	}
-	
+
 	// Skip prefix if present
 	startIndex := 0
 	if km.prefix != "" && len(parts) > 0 && parts[0] == km.prefix {
 		startIndex = 1
 	}
-	
+
 	if len(parts) > startIndex {
 		return parts[startIndex]
 	}
-	
+
 	return "unknown"
 }

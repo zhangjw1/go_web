@@ -26,7 +26,7 @@ func TestLoggerMiddleware(t *testing.T) {
 		Format: "json",
 		Output: "stdout",
 	}
-	
+
 	testLogger, err := logger.New(loggerConfig)
 	require.NoError(t, err)
 	testLogger.SetOutput(&buf)
@@ -34,7 +34,7 @@ func TestLoggerMiddleware(t *testing.T) {
 	// Create Gin router with logger middleware
 	router := gin.New()
 	router.Use(LoggerMiddleware(testLogger))
-	
+
 	// Add a test route
 	router.GET("/test", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "test"})
@@ -82,14 +82,14 @@ func TestLoggerMiddlewareWithError(t *testing.T) {
 		Format: "json",
 		Output: "stdout",
 	}
-	
+
 	testLogger, err := logger.New(loggerConfig)
 	require.NoError(t, err)
 	testLogger.SetOutput(&buf)
 
 	router := gin.New()
 	router.Use(LoggerMiddleware(testLogger))
-	
+
 	// Add a route that returns an error
 	router.GET("/error", func(c *gin.Context) {
 		c.Error(assert.AnError)
@@ -115,7 +115,7 @@ func TestRequestIDMiddleware(t *testing.T) {
 
 	router := gin.New()
 	router.Use(RequestIDMiddleware())
-	
+
 	var capturedRequestID string
 	router.GET("/test", func(c *gin.Context) {
 		capturedRequestID = GetRequestID(c)
@@ -130,7 +130,7 @@ func TestRequestIDMiddleware(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.NotEmpty(t, capturedRequestID)
-	
+
 	// Check that request ID is in response header
 	assert.Equal(t, capturedRequestID, w.Header().Get("X-Request-ID"))
 }
@@ -141,14 +141,14 @@ func TestGetRequestID(t *testing.T) {
 	t.Run("with request ID", func(t *testing.T) {
 		c, _ := gin.CreateTestContext(httptest.NewRecorder())
 		c.Set(RequestIDKey, "test-request-id")
-		
+
 		requestID := GetRequestID(c)
 		assert.Equal(t, "test-request-id", requestID)
 	})
 
 	t.Run("without request ID", func(t *testing.T) {
 		c, _ := gin.CreateTestContext(httptest.NewRecorder())
-		
+
 		requestID := GetRequestID(c)
 		assert.Empty(t, requestID)
 	})
@@ -156,7 +156,7 @@ func TestGetRequestID(t *testing.T) {
 	t.Run("with invalid request ID type", func(t *testing.T) {
 		c, _ := gin.CreateTestContext(httptest.NewRecorder())
 		c.Set(RequestIDKey, 123) // Invalid type
-		
+
 		requestID := GetRequestID(c)
 		assert.Empty(t, requestID)
 	})

@@ -13,26 +13,26 @@ import (
 type UserStatus string
 
 const (
-	UserStatusActive   UserStatus = "active"
-	UserStatusInactive UserStatus = "inactive"
-	UserStatusPending  UserStatus = "pending"
+	UserStatusActive    UserStatus = "active"
+	UserStatusInactive  UserStatus = "inactive"
+	UserStatusPending   UserStatus = "pending"
 	UserStatusSuspended UserStatus = "suspended"
 )
 
 // User represents a user in the system
 type User struct {
 	BaseModel
-	Username    string     `json:"username" gorm:"uniqueIndex;not null;size:50"`
-	Email       string     `json:"email" gorm:"uniqueIndex;not null;size:255"`
-	Password    string     `json:"-" gorm:"not null;size:255"` // Hidden in JSON
-	FirstName   string     `json:"first_name" gorm:"size:50"`
-	LastName    string     `json:"last_name" gorm:"size:50"`
-	Status      UserStatus `json:"status" gorm:"default:'pending';size:20"`
-	EmailVerified bool     `json:"email_verified" gorm:"default:false"`
+	Username        string     `json:"username" gorm:"uniqueIndex;not null;size:50"`
+	Email           string     `json:"email" gorm:"uniqueIndex;not null;size:255"`
+	Password        string     `json:"-" gorm:"not null;size:255"` // Hidden in JSON
+	FirstName       string     `json:"first_name" gorm:"size:50"`
+	LastName        string     `json:"last_name" gorm:"size:50"`
+	Status          UserStatus `json:"status" gorm:"default:'pending';size:20"`
+	EmailVerified   bool       `json:"email_verified" gorm:"default:false"`
 	EmailVerifiedAt *time.Time `json:"email_verified_at"`
-	LastLoginAt *time.Time `json:"last_login_at"`
-	LoginCount  int        `json:"login_count" gorm:"default:0"`
-	
+	LastLoginAt     *time.Time `json:"last_login_at"`
+	LoginCount      int        `json:"login_count" gorm:"default:0"`
+
 	// Relationship
 	Profile *Profile `json:"profile,omitempty" gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 }
@@ -199,7 +199,7 @@ type Profile struct {
 	JobTitle    string     `json:"job_title" gorm:"size:100"`
 	Timezone    string     `json:"timezone" gorm:"size:50;default:'UTC'"`
 	Language    string     `json:"language" gorm:"size:10;default:'en'"`
-	
+
 	// Relationship
 	User *User `json:"user,omitempty" gorm:"constraint:OnDelete:CASCADE"`
 }

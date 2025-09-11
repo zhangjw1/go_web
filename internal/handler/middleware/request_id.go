@@ -17,7 +17,7 @@ func RequestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Check if request ID is already present in headers
 		requestID := c.GetHeader(RequestIDHeader)
-		
+
 		// Generate a new request ID if not present
 		if requestID == "" {
 			requestID = uuid.New().String()
@@ -54,7 +54,7 @@ func RequestIDMiddlewareWithGenerator(generator func() string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Check if request ID is already present in headers
 		requestID := c.GetHeader(RequestIDHeader)
-		
+
 		// Generate a new request ID if not present
 		if requestID == "" {
 			requestID = generator()

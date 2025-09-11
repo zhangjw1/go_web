@@ -16,7 +16,7 @@ func main() {
 		Format: "json",
 		Output: "stdout",
 	}
-	
+
 	log, err := logger.New(loggerConfig)
 	if err != nil {
 		panic(err)
@@ -31,7 +31,7 @@ func main() {
 	println("\n=== Structured Logging ===")
 	log.WithRequestID("req-123").
 		WithField("user_id", "user-456").
-		WithField("duration", time.Millisecond * 150).
+		WithField("duration", time.Millisecond*150).
 		Info("User request processed")
 
 	// Example 3: HTTP request logging
@@ -42,26 +42,26 @@ func main() {
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
 		"192.168.1.100",
 		200,
-		time.Millisecond * 250,
+		time.Millisecond*250,
 	)
 
 	// Example 4: Database query logging
 	println("\n=== Database Query Logging ===")
 	log.LogDatabaseQuery(
 		"SELECT id, name, email FROM users WHERE active = ? LIMIT ?",
-		time.Millisecond * 45,
+		time.Millisecond*45,
 		25,
 	)
 
 	// Example 5: Cache operation logging
 	println("\n=== Cache Operation Logging ===")
-	log.LogCacheOperation("GET", "user:123:profile", true, time.Microsecond * 500)
-	log.LogCacheOperation("SET", "user:456:session", false, time.Millisecond * 2)
+	log.LogCacheOperation("GET", "user:123:profile", true, time.Microsecond*500)
+	log.LogCacheOperation("SET", "user:456:session", false, time.Millisecond*2)
 
 	// Example 6: Kafka message logging
 	println("\n=== Kafka Message Logging ===")
-	log.LogKafkaMessage("user-events", "produce", 1024, time.Millisecond * 15)
-	log.LogKafkaMessage("notification-events", "consume", 512, time.Millisecond * 8)
+	log.LogKafkaMessage("user-events", "produce", 1024, time.Millisecond*15)
+	log.LogKafkaMessage("notification-events", "consume", 512, time.Millisecond*8)
 
 	// Example 7: Business event logging
 	println("\n=== Business Event Logging ===")
@@ -82,8 +82,8 @@ func main() {
 	// Example 8: System event logging
 	println("\n=== System Event Logging ===")
 	systemDetails := map[string]interface{}{
-		"version":    "1.0.0",
-		"build_time": "2024-01-15T10:30:00Z",
+		"version":     "1.0.0",
+		"build_time":  "2024-01-15T10:30:00Z",
 		"environment": "production",
 	}
 	log.LogSystemEvent("application_started", systemDetails)
@@ -93,9 +93,9 @@ func main() {
 	err = errors.New("database connection failed")
 	log.WithError(err).
 		WithFields(map[string]interface{}{
-			"host":     "db.example.com",
-			"port":     3306,
-			"database": "myapp",
+			"host":        "db.example.com",
+			"port":        3306,
+			"database":    "myapp",
 			"retry_count": 3,
 		}).
 		Error("Failed to connect to database after retries")
@@ -107,7 +107,7 @@ func main() {
 		Format: "text",
 		Output: "stdout",
 	}
-	
+
 	textLog, err := logger.New(textLoggerConfig)
 	if err != nil {
 		panic(err)
