@@ -67,13 +67,13 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	ctx := context.Background()
 	if err := h.userRepo.Create(ctx, user); err != nil {
 		h.logger.WithError(err).WithField("username", user.Username).Error("Failed to create user")
-		
+
 		// Check if it's a duplicate key error
 		if isDuplicateKeyError(err) {
 			response.Conflict(c, "User with this username or email already exists")
 			return
 		}
-		
+
 		response.InternalServerError(c, "Failed to create user")
 		return
 	}
@@ -113,7 +113,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 			response.NotFound(c, "User not found")
 			return
 		}
-		
+
 		h.logger.WithError(err).WithField("user_id", id).Error("Failed to get user")
 		response.InternalServerError(c, "Failed to retrieve user")
 		return
@@ -172,7 +172,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 			response.NotFound(c, "User not found")
 			return
 		}
-		
+
 		h.logger.WithError(err).WithField("user_id", id).Error("Failed to get user for update")
 		response.InternalServerError(c, "Failed to retrieve user")
 		return
@@ -184,13 +184,13 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	// Update user
 	if err := h.userRepo.Update(ctx, user); err != nil {
 		h.logger.WithError(err).WithField("user_id", id).Error("Failed to update user")
-		
+
 		// Check if it's a duplicate key error
 		if isDuplicateKeyError(err) {
 			response.Conflict(c, "User with this username or email already exists")
 			return
 		}
-		
+
 		response.InternalServerError(c, "Failed to update user")
 		return
 	}
@@ -231,7 +231,7 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 			response.NotFound(c, "User not found")
 			return
 		}
-		
+
 		h.logger.WithError(err).WithField("user_id", id).Error("Failed to get user for deletion")
 		response.InternalServerError(c, "Failed to retrieve user")
 		return
@@ -356,7 +356,7 @@ func (h *UserHandler) GetUserByUsername(c *gin.Context) {
 			response.NotFound(c, "User not found")
 			return
 		}
-		
+
 		h.logger.WithError(err).WithField("username", username).Error("Failed to get user by username")
 		response.InternalServerError(c, "Failed to retrieve user")
 		return
@@ -415,7 +415,7 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 			response.NotFound(c, "User not found")
 			return
 		}
-		
+
 		h.logger.WithError(err).WithField("user_id", id).Error("Failed to get user for password change")
 		response.InternalServerError(c, "Failed to retrieve user")
 		return
