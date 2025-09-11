@@ -1,0 +1,716 @@
+package service
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
+
+	"go-web-starter/internal/domain/model"
+	"go-web-starter/internal/domain/repository"
+	"go-web-starter/internal/domain/service"
+	"go-web-starter/internal/infrastructure/cache"
+	"go-web-starter/internal/infrastructure/logger"
+	"go-web-starter/internal/infrastructure/messaging"
+)
+
+// UserServiceImpl implements the UserService interface
+type UserServiceImpl struct {
+	userRepo    repository.UserRepository
+	cache       *cache.Manager
+	messaging   *messaging.Manager
+	logger      *logger.Logger
+}
+
+// NewUserService creates a new user service instance
+func NewUserService(
+	userRepo repository.UserRepository,
+	cache *cache.Manager,
+	messaging *messaging.Manager,
+	logger *logger.Logger,
+) service.UserService {
+	return &UserServiceImpl{
+		userRepo:  userRepo,
+		cache:     cache,
+		messaging: messaging,
+		logger:    logger,
+	}
+}
+
+// CreateUser creates a new user
+func (s *UserServiceImpl) CreateUser(ctx context.Context, req *service.CreateUserRequest) (*model.User, error) {
+	// Validate request
+	if err := service.ValidateCreateUserRequest(req); err != nil {
+		s.logger.WithError(err).WithField("request", req).Error("Invalid create user request")
+		return nil, err
+	}
+
+	// Check if user already exists by username
+	existingUser, err := s.userRepo.GetByUsername(ctx, req.Username)
+	if err != nil && err != repository.ErrUserNotFound {
+		s.logger.WithError(err).WithField("username", req.Username).Error("Failed to check existing user by username")
+		return nil, service.ErrInternalError
+	}
+	if existingUser != nil {
+		return nil, service.NewServiceError("USER_EXISTS", "User with this username already exists", map[string]interface{}{
+			"field": "username",
+			"value": req.Username,
+		})
+	}
+
+	// Check if user already exists by email
+	existingUser, err = s.userRepo.GetByEmail(ctx, req.Email)
+	if err != nil && err != repository.ErrUserNotFound {
+		s.logger.WithError(err).WithField("email", req.Email).Error("Failed to check existing user by email")
+		return nil, service.ErrInternalError
+	}
+	if existingUser != nil {
+		return nil, service.NewServiceError("USER_EXISTS", "User with this email already exists", map[string]interface{}{
+			"field": "email",
+			"value": req.Email,
+		})
+	}
+
+	// Hash password
+	hashedPassword, err := s.hashPassword(req.Password)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to hash password")
+		return nil, service.ErrInternalError
+	}
+
+	// Parse full name into first and last name
+	var firstName, lastName string
+	if req.FullName != "" {
+		parts := strings.Fields(req.FullName)
+		if len(parts) > 0 {
+			firstName = parts[0]
+		}
+		if len(parts) > 1 {
+			lastName = strings.Join(parts[1:], " ")
+		}
+	}
+
+	// Create user model
+	user := &model.User{
+		Username:  req.Username,
+		Email:     req.Email,
+		Password:  hashedPassword,
+		FirstName: firstName,
+		LastName:  lastName,
+		Status:    model.UserStatusActive,
+	}
+
+	// Save user to database
+	err = s.userRepo.Create(ctx, user)
+	if err != nil {
+		s.logger.WithError(err).WithField("user", user).Error("Failed to create user")
+		return nil, service.ErrInternalError
+	}
+
+	// Cache the user
+	s.cacheUser(ctx, user)
+
+	// Publish user created event
+	userData := map[string]interface{}{
+		"username":   user.Username,
+		"email":      user.Email,
+		"first_name": user.FirstName,
+		"last_name":  user.LastName,
+	}
+	if err := s.messaging.PublishUserCreated(ctx, int64(user.ID), userData); err != nil {
+		s.logger.WithError(err).WithField("user_id", user.ID).Error("Failed to publish user created event")
+		// Don't return error as user creation was successful
+	}
+
+	s.logger.WithField("user_id", user.ID).WithField("username", user.Username).Info("User created successfully")
+	return user, nil
+}
+
+// GetUserByID retrieves a user by ID
+func (s *UserServiceImpl) GetUserByID(ctx context.Context, id int64) (*model.User, error) {
+	// Try to get from cache first
+	if cachedUser, err := s.getUserFromCache(ctx, id); err == nil && cachedUser != nil {
+		return cachedUser, nil
+	}
+
+	// Get from database
+	user, err := s.userRepo.GetByID(ctx, uint(id))
+	if err != nil {
+		if err == repository.ErrUserNotFound {
+			return nil, service.ErrUserNotFound
+		}
+		s.logger.WithError(err).WithField("user_id", id).Error("Failed to get user by ID")
+		return nil, service.ErrInternalError
+	}
+
+	// Cache the user
+	s.cacheUser(ctx, user)
+
+	return user, nil
+}
+
+// GetUserByUsername retrieves a user by username
+func (s *UserServiceImpl) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
+	// Try to get from cache first
+	if cachedUser, err := s.getUserByUsernameFromCache(ctx, username); err == nil && cachedUser != nil {
+		return cachedUser, nil
+	}
+
+	// Get from database
+	user, err := s.userRepo.GetByUsername(ctx, username)
+	if err != nil {
+		if err == repository.ErrUserNotFound {
+			return nil, service.ErrUserNotFound
+		}
+		s.logger.WithError(err).WithField("username", username).Error("Failed to get user by username")
+		return nil, service.ErrInternalError
+	}
+
+	// Cache the user
+	s.cacheUser(ctx, user)
+	s.cacheUserByUsername(ctx, user)
+
+	return user, nil
+}
+
+// GetUserByEmail retrieves a user by email
+func (s *UserServiceImpl) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
+	// Get from database (email lookups are less frequent, so we don't cache them)
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		if err == repository.ErrUserNotFound {
+			return nil, service.ErrUserNotFound
+		}
+		s.logger.WithError(err).WithField("email", email).Error("Failed to get user by email")
+		return nil, service.ErrInternalError
+	}
+
+	return user, nil
+}
+
+// UpdateUser updates an existing user
+func (s *UserServiceImpl) UpdateUser(ctx context.Context, id int64, req *service.UpdateUserRequest) (*model.User, error) {
+	// Validate request
+	if err := service.ValidateUpdateUserRequest(req); err != nil {
+		s.logger.WithError(err).WithField("user_id", id).WithField("request", req).Error("Invalid update user request")
+		return nil, err
+	}
+
+	// Get existing user
+	existingUser, err := s.GetUserByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for username conflicts
+	if req.Username != nil && *req.Username != existingUser.Username {
+		conflictUser, err := s.userRepo.GetByUsername(ctx, *req.Username)
+		if err != nil && err != repository.ErrUserNotFound {
+			s.logger.WithError(err).WithField("username", *req.Username).Error("Failed to check username conflict")
+			return nil, service.ErrInternalError
+		}
+		if conflictUser != nil {
+			return nil, service.NewServiceError("USERNAME_EXISTS", "Username already exists", map[string]interface{}{
+				"field": "username",
+				"value": *req.Username,
+			})
+		}
+	}
+
+	// Check for email conflicts
+	if req.Email != nil && *req.Email != existingUser.Email {
+		conflictUser, err := s.userRepo.GetByEmail(ctx, *req.Email)
+		if err != nil && err != repository.ErrUserNotFound {
+			s.logger.WithError(err).WithField("email", *req.Email).Error("Failed to check email conflict")
+			return nil, service.ErrInternalError
+		}
+		if conflictUser != nil {
+			return nil, service.NewServiceError("EMAIL_EXISTS", "Email already exists", map[string]interface{}{
+				"field": "email",
+				"value": *req.Email,
+			})
+		}
+	}
+
+	// Prepare update data
+	updates := make(map[string]interface{})
+	changes := make(map[string]interface{})
+
+	if req.Username != nil {
+		updates["username"] = *req.Username
+		changes["username"] = map[string]interface{}{
+			"old": existingUser.Username,
+			"new": *req.Username,
+		}
+	}
+	if req.Email != nil {
+		updates["email"] = *req.Email
+		changes["email"] = map[string]interface{}{
+			"old": existingUser.Email,
+			"new": *req.Email,
+		}
+	}
+	if req.FullName != nil {
+		// Parse full name into first and last name
+		parts := strings.Fields(*req.FullName)
+		if len(parts) > 0 {
+			updates["first_name"] = parts[0]
+		}
+		if len(parts) > 1 {
+			updates["last_name"] = strings.Join(parts[1:], " ")
+		}
+		changes["full_name"] = map[string]interface{}{
+			"old": existingUser.GetFullName(),
+			"new": *req.FullName,
+		}
+	}
+	// Note: Bio and Avatar are stored in Profile, not User
+	// For now, we'll skip these fields in user updates
+	if req.Avatar != nil {
+		// Avatar should be handled in profile updates
+		s.logger.WithField("user_id", existingUser.ID).Debug("Avatar update requested but not implemented in user service")
+		changes["avatar"] = map[string]interface{}{
+			"old": "", // Avatar is in Profile model, not User
+			"new": *req.Avatar,
+		}
+	}
+
+	// Apply updates to existing user
+	if firstName, ok := updates["first_name"]; ok {
+		existingUser.FirstName = firstName.(string)
+	}
+	if lastName, ok := updates["last_name"]; ok {
+		existingUser.LastName = lastName.(string)
+	}
+	if username, ok := updates["username"]; ok {
+		existingUser.Username = username.(string)
+	}
+	if email, ok := updates["email"]; ok {
+		existingUser.Email = email.(string)
+	}
+
+	// Update user in database
+	err = s.userRepo.Update(ctx, existingUser)
+	if err != nil {
+		s.logger.WithError(err).WithField("user_id", id).WithField("updates", updates).Error("Failed to update user")
+		return nil, service.ErrInternalError
+	}
+
+	// Clear cache
+	s.clearUserCache(ctx, existingUser)
+
+	// Cache updated user
+	s.cacheUser(ctx, existingUser)
+	s.cacheUserByUsername(ctx, existingUser)
+
+	// Publish user updated event
+	if err := s.messaging.PublishUserUpdated(ctx, int64(existingUser.ID), changes); err != nil {
+		s.logger.WithError(err).WithField("user_id", existingUser.ID).Error("Failed to publish user updated event")
+		// Don't return error as user update was successful
+	}
+
+	s.logger.WithField("user_id", existingUser.ID).WithField("changes", changes).Info("User updated successfully")
+	return existingUser, nil
+}
+
+// DeleteUser deletes a user
+func (s *UserServiceImpl) DeleteUser(ctx context.Context, id int64) error {
+	// Get existing user
+	existingUser, err := s.GetUserByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Delete user from database
+	if err := s.userRepo.Delete(ctx, uint(id)); err != nil {
+		s.logger.WithError(err).WithField("user_id", id).Error("Failed to delete user")
+		return service.ErrInternalError
+	}
+
+	// Clear cache
+	s.clearUserCache(ctx, existingUser)
+
+	// Publish user deleted event
+	if err := s.messaging.PublishUserDeleted(ctx, id); err != nil {
+		s.logger.WithError(err).WithField("user_id", id).Error("Failed to publish user deleted event")
+		// Don't return error as user deletion was successful
+	}
+
+	s.logger.WithField("user_id", id).WithField("username", existingUser.Username).Info("User deleted successfully")
+	return nil
+}
+
+// ListUsers lists users with pagination and filtering
+func (s *UserServiceImpl) ListUsers(ctx context.Context, req *service.ListUsersRequest) (*service.ListUsersResponse, error) {
+	// Validate and set defaults
+	if err := service.ValidateListUsersRequest(req); err != nil {
+		return nil, err
+	}
+
+	// Prepare query parameters
+	queryParams := &model.UserQueryParams{
+		PaginationParams: model.PaginationParams{
+			Page:     req.Page,
+			PageSize: req.PerPage,
+		},
+		UserSort: model.UserSort{
+			SortParams: model.SortParams{
+				SortBy:    req.SortBy,
+				SortOrder: "desc",
+			},
+		},
+		UserFilter: model.UserFilter{
+			Username: req.Search, // Use search as username filter for now
+		},
+	}
+
+	// Set defaults
+	queryParams.SetDefaults()
+
+	// Convert to base QueryParams
+	baseParams := &model.QueryParams{
+		PaginationParams: queryParams.PaginationParams,
+		SortParams:       queryParams.UserSort.SortParams,
+		FilterParams:     queryParams.UserFilter.FilterParams,
+	}
+
+	// Get users from database
+	result, err := s.userRepo.List(ctx, baseParams)
+	if err != nil {
+		s.logger.WithError(err).WithField("params", queryParams).Error("Failed to list users")
+		return nil, service.ErrInternalError
+	}
+
+	users := result.Data.([]*model.User)
+	total := result.Total
+
+	// Calculate total pages
+	totalPages := service.CalculateTotalPages(total, req.PerPage)
+
+	response := &service.ListUsersResponse{
+		Users:      users,
+		Total:      total,
+		Page:       req.Page,
+		PerPage:    req.PerPage,
+		TotalPages: totalPages,
+	}
+
+	return response, nil
+}
+
+// SearchUsers searches for users by query
+func (s *UserServiceImpl) SearchUsers(ctx context.Context, query string, limit int) ([]*model.User, error) {
+	// Sanitize query
+	query = service.SanitizeSearchQuery(query)
+	if query == "" {
+		return []*model.User{}, nil
+	}
+
+	// Set reasonable limit
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+
+	// TODO: Implement search functionality using SearchUsers method
+	params := &model.PaginationParams{
+		Page:     1,
+		PageSize: limit,
+	}
+	result, err := s.userRepo.SearchUsers(ctx, query, params)
+	if err != nil {
+		s.logger.WithError(err).WithField("query", query).WithField("limit", limit).Error("Failed to search users")
+		return nil, service.ErrInternalError
+	}
+	users := result.Data.([]*model.User)
+
+	return users, nil
+}
+
+// AuthenticateUser authenticates a user with username and password
+func (s *UserServiceImpl) AuthenticateUser(ctx context.Context, username, password string) (*model.User, error) {
+	// Get user by username
+	user, err := s.GetUserByUsername(ctx, username)
+	if err != nil {
+		if err == service.ErrUserNotFound {
+			return nil, service.ErrInvalidCredentials
+		}
+		return nil, err
+	}
+
+	// Check if user is active
+	if !user.IsActive() {
+		return nil, service.ErrUserInactive
+	}
+
+	// Verify password
+	if !s.verifyPassword(password, user.Password) {
+		return nil, service.ErrInvalidCredentials
+	}
+
+	return user, nil
+}
+
+// ChangePassword changes a user's password
+func (s *UserServiceImpl) ChangePassword(ctx context.Context, userID int64, currentPassword, newPassword string) error {
+	// Get user
+	user, err := s.GetUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// Verify current password
+	if !s.verifyPassword(currentPassword, user.Password) {
+		return service.ErrInvalidPassword
+	}
+
+	// Hash new password
+	hashedPassword, err := s.hashPassword(newPassword)
+	if err != nil {
+		s.logger.WithError(err).WithField("user_id", userID).Error("Failed to hash new password")
+		return service.ErrInternalError
+	}
+
+	// Update password in database
+	user.Password = hashedPassword
+
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		s.logger.WithError(err).WithField("user_id", userID).Error("Failed to update password")
+		return service.ErrInternalError
+	}
+
+	// Clear cache
+	s.clearUserCache(ctx, user)
+
+	s.logger.WithField("user_id", userID).Info("Password changed successfully")
+	return nil
+}
+
+// ActivateUser activates a user
+func (s *UserServiceImpl) ActivateUser(ctx context.Context, userID int64) error {
+	return s.setUserActiveStatus(ctx, userID, true)
+}
+
+// DeactivateUser deactivates a user
+func (s *UserServiceImpl) DeactivateUser(ctx context.Context, userID int64) error {
+	return s.setUserActiveStatus(ctx, userID, false)
+}
+
+// GetUserStats returns user statistics
+func (s *UserServiceImpl) GetUserStats(ctx context.Context) (*service.UserStats, error) {
+	// TODO: Implement user statistics
+	return &service.UserStats{
+		TotalUsers:        0,
+		ActiveUsers:       0,
+		InactiveUsers:     0,
+		NewUsersToday:     0,
+		NewUsersThisWeek:  0,
+		NewUsersThisMonth: 0,
+	}, nil
+}
+
+// Helper methods
+
+// setUserActiveStatus sets the active status of a user
+func (s *UserServiceImpl) setUserActiveStatus(ctx context.Context, userID int64, isActive bool) error {
+	// Get existing user
+	existingUser, err := s.GetUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// Check if status is already set
+	if existingUser.IsActive() == isActive {
+		return nil // No change needed
+	}
+
+	// Update status in database
+	if isActive {
+		existingUser.Status = model.UserStatusActive
+	} else {
+		existingUser.Status = model.UserStatusInactive
+	}
+
+	err = s.userRepo.Update(ctx, existingUser)
+	if err != nil {
+		s.logger.WithError(err).WithField("user_id", userID).WithField("is_active", isActive).Error("Failed to update user active status")
+		return service.ErrInternalError
+	}
+
+	// Clear cache
+	s.clearUserCache(ctx, existingUser)
+
+	// Cache updated user
+	s.cacheUser(ctx, existingUser)
+	s.cacheUserByUsername(ctx, existingUser)
+
+	// Publish event
+	eventType := "user.activated"
+	if !isActive {
+		eventType = "user.deactivated"
+	}
+
+	changes := map[string]interface{}{
+		"status": map[string]interface{}{
+			"old": existingUser.Status,
+			"new": isActive,
+		},
+	}
+
+	if err := s.messaging.PublishUserUpdated(ctx, userID, changes); err != nil {
+		s.logger.WithError(err).WithField("user_id", userID).WithField("event_type", eventType).Error("Failed to publish user status change event")
+	}
+
+	s.logger.WithField("user_id", userID).WithField("is_active", isActive).Info("User active status updated successfully")
+	return nil
+}
+
+// hashPassword hashes a password using bcrypt
+func (s *UserServiceImpl) hashPassword(password string) (string, error) {
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashedBytes), nil
+}
+
+// verifyPassword verifies a password against a hash
+func (s *UserServiceImpl) verifyPassword(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+// Cache helper methods
+
+// cacheUser caches a user by ID
+func (s *UserServiceImpl) cacheUser(ctx context.Context, user *model.User) {
+	if s.cache == nil {
+		return
+	}
+
+	userData := map[string]interface{}{
+		"id":            user.ID,
+		"username":      user.Username,
+		"email":         user.Email,
+		"full_name":     user.FullName,
+		"bio":           user.Bio,
+		"avatar":        user.Avatar,
+		"is_active":     user.IsActive,
+		"created_at":    user.CreatedAt,
+		"updated_at":    user.UpdatedAt,
+	}
+
+	if err := s.cache.SetUser(ctx, user.ID, userData); err != nil {
+		s.logger.WithError(err).WithField("user_id", user.ID).Error("Failed to cache user")
+	}
+}
+
+// cacheUserByUsername caches a user by username
+func (s *UserServiceImpl) cacheUserByUsername(ctx context.Context, user *model.User) {
+	if s.cache == nil {
+		return
+	}
+
+	userData := map[string]interface{}{
+		"id":            user.ID,
+		"username":      user.Username,
+		"email":         user.Email,
+		"full_name":     user.FullName,
+		"bio":           user.Bio,
+		"avatar":        user.Avatar,
+		"is_active":     user.IsActive,
+		"created_at":    user.CreatedAt,
+		"updated_at":    user.UpdatedAt,
+	}
+
+	if err := s.cache.SetUserByUsername(ctx, user.Username, userData); err != nil {
+		s.logger.WithError(err).WithField("username", user.Username).Error("Failed to cache user by username")
+	}
+}
+
+// getUserFromCache retrieves a user from cache by ID
+func (s *UserServiceImpl) getUserFromCache(ctx context.Context, userID int64) (*model.User, error) {
+	if s.cache == nil {
+		return nil, fmt.Errorf("cache not available")
+	}
+
+	userData, err := s.cache.GetUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.mapCacheDataToUser(userData), nil
+}
+
+// getUserByUsernameFromCache retrieves a user from cache by username
+func (s *UserServiceImpl) getUserByUsernameFromCache(ctx context.Context, username string) (*model.User, error) {
+	if s.cache == nil {
+		return nil, fmt.Errorf("cache not available")
+	}
+
+	userData, err := s.cache.GetUserByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.mapCacheDataToUser(userData), nil
+}
+
+// clearUserCache clears user cache entries
+func (s *UserServiceImpl) clearUserCache(ctx context.Context, user *model.User) {
+	if s.cache == nil {
+		return
+	}
+
+	// Clear cache by ID
+	if err := s.cache.DeleteUser(ctx, user.ID); err != nil {
+		s.logger.WithError(err).WithField("user_id", user.ID).Error("Failed to clear user cache by ID")
+	}
+
+	// Clear cache by username (we need to construct the key manually)
+	keyManager := s.cache.GetKeyManager()
+	usernameKey := keyManager.UserByUsernameKey(user.Username)
+	if err := s.cache.GetService().Delete(ctx, usernameKey); err != nil {
+		s.logger.WithError(err).WithField("username", user.Username).Error("Failed to clear user cache by username")
+	}
+}
+
+// mapCacheDataToUser maps cache data to user model
+func (s *UserServiceImpl) mapCacheDataToUser(data map[string]interface{}) *model.User {
+	user := &model.User{}
+
+	if id, ok := data["id"].(float64); ok {
+		user.ID = int64(id)
+	}
+	if username, ok := data["username"].(string); ok {
+		user.Username = username
+	}
+	if email, ok := data["email"].(string); ok {
+		user.Email = email
+	}
+	if fullName, ok := data["full_name"].(string); ok {
+		user.FullName = fullName
+	}
+	if bio, ok := data["bio"].(string); ok {
+		user.Bio = bio
+	}
+	if avatar, ok := data["avatar"].(string); ok {
+		user.Avatar = avatar
+	}
+	if isActive, ok := data["is_active"].(bool); ok {
+		user.IsActive = isActive
+	}
+	if createdAt, ok := data["created_at"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, createdAt); err == nil {
+			user.CreatedAt = t
+		}
+	}
+	if updatedAt, ok := data["updated_at"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, updatedAt); err == nil {
+			user.UpdatedAt = t
+		}
+	}
+
+	return user
+}
