@@ -1,10 +1,12 @@
+//go:build examples
+// +build examples
+
 package main
 
 import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"go-web-starter/internal/config"
 	"go-web-starter/internal/domain/model"

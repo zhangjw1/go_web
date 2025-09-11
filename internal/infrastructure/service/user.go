@@ -9,31 +9,23 @@ import (
 	"go-web-starter/internal/domain/model"
 	"go-web-starter/internal/domain/repository"
 	"go-web-starter/internal/domain/service"
-	"go-web-starter/internal/infrastructure/cache"
 	"go-web-starter/internal/infrastructure/logger"
-	"go-web-starter/internal/infrastructure/messaging"
 )
 
 // userServiceSimple is a simplified implementation of UserService
 type userServiceSimple struct {
-	userRepo  repository.UserRepository
-	cache     *cache.Manager
-	messaging *messaging.Manager
-	logger    *logger.Logger
+	userRepo repository.UserRepository
+	logger   *logger.Logger
 }
 
 // NewUserServiceSimple creates a new simplified user service
 func NewUserServiceSimple(
 	userRepo repository.UserRepository,
-	cache *cache.Manager,
-	messaging *messaging.Manager,
 	logger *logger.Logger,
 ) service.UserService {
 	return &userServiceSimple{
-		userRepo:  userRepo,
-		cache:     cache,
-		messaging: messaging,
-		logger:    logger,
+		userRepo: userRepo,
+		logger:   logger,
 	}
 }
 
@@ -143,7 +135,7 @@ func (s *userServiceSimple) SearchUsers(ctx context.Context, query string, limit
 		Page:     1,
 		PageSize: limit,
 	}
-	
+
 	result, err := s.userRepo.SearchUsers(ctx, query, params)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to search users")

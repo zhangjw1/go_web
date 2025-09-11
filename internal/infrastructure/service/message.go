@@ -13,20 +13,22 @@ import (
 
 // MessageServiceImpl implements the MessageService interface
 type MessageServiceImpl struct {
-	messaging *messaging.Manager
-	cache     *cache.Manager
+	messaging messaging.MessagingService
+	cache     cache.CacheService
+	keys      *cache.KeyManager
 	logger    *logger.Logger
 }
 
 // NewMessageService creates a new message service instance
 func NewMessageService(
-	messaging *messaging.Manager,
-	cache *cache.Manager,
+	messagingSvc messaging.MessagingService,
+	cacheSvc cache.CacheService,
 	logger *logger.Logger,
 ) service.MessageService {
 	return &MessageServiceImpl{
-		messaging: messaging,
-		cache:     cache,
+		messaging: messagingSvc,
+		cache:     cacheSvc,
+		keys:      cache.NewKeyManager(""),
 		logger:    logger,
 	}
 }
@@ -61,8 +63,9 @@ func (s *MessageServiceImpl) HandleUserCreated(ctx context.Context, userID int64
 				"user_id":   userID,
 				"user_name": name,
 			}
-			
-			if err := s.messaging.PublishEmailNotification(ctx, email, "Welcome!", fmt.Sprintf("Welcome %s!", name), welcomeData); err != nil {
+
+			env := messaging.NewEnvelopedMessage(messaging.EventEmailNotification, "notification", messaging.NotificationEvent{Type: "email", Recipient: email, Subject: "Welcome!", Content: fmt.Sprintf("Welcome %s!", name), Data: welcomeData, Timestamp: time.Now().UTC()})
+			if err := s.messaging.SendJSONMessage(messaging.TopicNotifications, "", env); err != nil {
 				s.logger.WithError(err).WithField("user_id", userID).Error("Failed to send welcome email notification")
 			}
 		}
@@ -186,8 +189,11 @@ func (s *MessageServiceImpl) HandleHealthCheck(ctx context.Context, healthData m
 	s.logger.WithField("health_data", healthData).Debug("Handling health check event")
 
 	// Cache health check status
-	if err := s.cache.SetHealthStatus(ctx, "go-web-starter", healthData); err != nil {
-		s.logger.WithError(err).Error("Failed to cache health check status")
+	if s.cache != nil {
+		key := s.keys.HealthCheckKey("go-web-starter")
+		if err := s.cache.SetJSON(ctx, key, healthData, s.keys.GetKeyTTL("health")); err != nil {
+			s.logger.WithError(err).Error("Failed to cache health check status")
+		}
 	}
 
 	// Update health check counter
@@ -313,7 +319,8 @@ func (s *MessageServiceImpl) incrementUserCounter(ctx context.Context, counterNa
 		return nil
 	}
 
-	_, err := s.cache.IncrementCounter(ctx, counterName)
+	key := s.keys.CounterKey(counterName)
+	_, err := s.cache.Increment(ctx, key)
 	return err
 }
 
@@ -323,7 +330,8 @@ func (s *MessageServiceImpl) incrementCounter(ctx context.Context, counterName s
 		return nil
 	}
 
-	_, err := s.cache.IncrementCounter(ctx, counterName)
+	key := s.keys.CounterKey(counterName)
+	_, err := s.cache.Increment(ctx, key)
 	return err
 }
 
@@ -335,7 +343,7 @@ func (s *MessageServiceImpl) cacheEvent(ctx context.Context, key string, eventDa
 
 	// Cache events for 7 days
 	ttl := 7 * 24 * time.Hour
-	return s.cache.GetService().SetJSON(ctx, key, eventData, ttl)
+	return s.cache.SetJSON(ctx, key, eventData, ttl)
 }
 
 // clearUserCache clears user cache by ID
@@ -344,7 +352,8 @@ func (s *MessageServiceImpl) clearUserCache(ctx context.Context, userID int64) e
 		return nil
 	}
 
-	return s.cache.DeleteUser(ctx, userID)
+	key := s.keys.UserKey(userID)
+	return s.cache.Delete(ctx, key)
 }
 
 // clearAllUserCache clears all user-related cache entries
@@ -354,7 +363,8 @@ func (s *MessageServiceImpl) clearAllUserCache(ctx context.Context, userID int64
 	}
 
 	// Clear user cache by ID
-	if err := s.cache.DeleteUser(ctx, userID); err != nil {
+	key := s.keys.UserKey(userID)
+	if err := s.cache.Delete(ctx, key); err != nil {
 		s.logger.WithError(err).WithField("user_id", userID).Error("Failed to clear user cache by ID")
 	}
 
@@ -382,7 +392,8 @@ func (s *MessageServiceImpl) resetDailyCounters(ctx context.Context) error {
 	}
 
 	for _, counter := range counters {
-		if err := s.cache.ResetCounter(ctx, counter); err != nil {
+		key := s.keys.CounterKey(counter)
+		if err := s.cache.Set(ctx, key, "0", s.keys.GetKeyTTL("counter")); err != nil {
 			s.logger.WithError(err).WithField("counter", counter).Error("Failed to reset daily counter")
 		}
 	}
@@ -398,28 +409,28 @@ func (s *MessageServiceImpl) checkFailedLoginAttempts(ctx context.Context, userI
 
 	// Increment failed login counter for user
 	userKey := fmt.Sprintf("failed_logins_user_%d", userID)
-	userAttempts, err := s.cache.IncrementCounter(ctx, userKey)
+	userAttempts, err := s.cache.Increment(ctx, userKey)
 	if err != nil {
 		return err
 	}
 
 	// Set expiration for user counter (1 hour)
 	if userAttempts == 1 {
-		if err := s.cache.GetService().Expire(ctx, userKey, time.Hour); err != nil {
+		if err := s.cache.Expire(ctx, userKey, time.Hour); err != nil {
 			s.logger.WithError(err).Error("Failed to set expiration for user failed login counter")
 		}
 	}
 
 	// Increment failed login counter for IP
 	ipKey := fmt.Sprintf("failed_logins_ip_%s", ipAddress)
-	ipAttempts, err := s.cache.IncrementCounter(ctx, ipKey)
+	ipAttempts, err := s.cache.Increment(ctx, ipKey)
 	if err != nil {
 		return err
 	}
 
 	// Set expiration for IP counter (1 hour)
 	if ipAttempts == 1 {
-		if err := s.cache.GetService().Expire(ctx, ipKey, time.Hour); err != nil {
+		if err := s.cache.Expire(ctx, ipKey, time.Hour); err != nil {
 			s.logger.WithError(err).Error("Failed to set expiration for IP failed login counter")
 		}
 	}
