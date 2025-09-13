@@ -175,11 +175,24 @@ func (a *App) initMessaging() error {
 	return nil
 }
 
-// initHTTPServer initializes the HTTP server and routes
+// initHTTPServer 初始化HTTP服务器和路由
+// 该函数负责设置Gin框架、配置路由、初始化处理器、注册路由，
+// 并根据配置创建HTTP服务器实例。
+//
+// 执行步骤包括：
+// 1. 根据配置设置Gin运行模式（release/test/debug）
+// 2. 创建新的Gin路由器
+// 3. 初始化Gin自定义验证器（注册用户名/密码/手机号等验证规则）
+// 4. 创建路由处理器（健康检查和用户处理器）
+// 5. 设置路由管理器并注册所有路由
+// 6. 创建HTTP服务器实例，配置超时时间和端口
+//
+// 返回值：
+//   - error: 成功时返回nil，失败时返回错误信息
 func (a *App) initHTTPServer() error {
-	a.logger.Info("Initializing HTTP server...")
+	a.logger.Info("正在初始化HTTP服务器...")
 
-	// Set Gin mode based on configuration
+	// 根据配置设置Gin模式
 	switch a.config.Server.Mode {
 	case "release":
 		gin.SetMode(gin.ReleaseMode)
@@ -189,15 +202,16 @@ func (a *App) initHTTPServer() error {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	// Create Gin router
+	// 创建Gin路由器
 	a.router = gin.New()
 
-	// Initialize custom validators for Gin binding (registers username/password/phone, etc.)
+	// 初始化Gin绑定的自定义验证器（注册用户名/密码/手机号等验证规则）
 	validator.InitGinValidator()
 
-	// Create route manager
+	// 创建路由管理器
 	healthHandler := handler.NewHealthHandler(a.config, a.logger, a.db, a.cache, a.msgSvc)
 	var userHandler *handler.UserHandler
+	// 如果数据库可用，则创建用户处理器
 	if a.db != nil {
 		userRepo := repository.NewUserRepository(a.db.DB, a.logger)
 		userHandler = handler.NewUserHandler(userRepo, a.config, a.logger)
@@ -209,38 +223,41 @@ func (a *App) initHTTPServer() error {
 		userHandler,
 	)
 
-	// Register all routes
+	// 注册所有路由
 	a.routeManager.RegisterRoutes(a.router)
 
-	// Create HTTP server
+	// 创建HTTP服务器
 	a.server = &http.Server{
-		Addr:         ":" + a.config.Server.Port,
-		Handler:      a.router,
-		ReadTimeout:  time.Duration(a.config.Server.ReadTimeout) * time.Second,
-		WriteTimeout: time.Duration(a.config.Server.WriteTimeout) * time.Second,
+		Addr:         ":" + a.config.Server.Port,                                // 服务器地址和端口
+		Handler:      a.router,                                                  // 请求处理器
+		ReadTimeout:  time.Duration(a.config.Server.ReadTimeout) * time.Second,  // 读取超时时间
+		WriteTimeout: time.Duration(a.config.Server.WriteTimeout) * time.Second, // 写入超时时间
 	}
 
-	a.logger.WithField("port", a.config.Server.Port).Info("HTTP server initialized")
+	a.logger.WithField("port", a.config.Server.Port).Info("HTTP服务器初始化完成")
 	return nil
 }
 
 // Run starts the application
+// Run 启动应用程序的主要运行逻辑
+// 该函数负责启动消息消费者、发布系统启动事件、启动HTTP服务器，并等待关闭信号
+// 返回值: error - 如果在启动或运行过程中发生致命错误则返回错误信息
 func (a *App) Run() error {
 	a.logger.WithField("port", a.config.Server.Port).WithField("mode", a.config.Server.Mode).Info("Starting Go Web Starter")
 
-	// Start message consumers if messaging is available
+	// 启动消息消费者（如果消息功能可用）
 	if err := a.startMessageConsumers(); err != nil {
 		a.logger.WithError(err).Error("Failed to start message consumers")
-		// Continue without message consumers
+		// 即使消息消费者启动失败也继续运行应用程序
 	}
 
-	// Publish system startup event
+	// 发布系统启动事件
 	if err := a.publishSystemStartup(); err != nil {
 		a.logger.WithError(err).Error("Failed to publish system startup event")
-		// Continue without event publishing
+		// 即使事件发布失败也继续运行应用程序
 	}
 
-	// Start HTTP server in a goroutine
+	// 在goroutine中启动HTTP服务器以避免阻塞主线程
 	go func() {
 		a.logger.WithField("port", a.config.Server.Port).Info("Starting HTTP server")
 		if err := a.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -250,7 +267,7 @@ func (a *App) Run() error {
 
 	a.logger.WithField("port", a.config.Server.Port).Info("Application started successfully")
 
-	// Wait for interrupt signal
+	// 等待中断信号以优雅地关闭应用程序
 	return a.waitForShutdown()
 }
 

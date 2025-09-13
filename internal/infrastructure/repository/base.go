@@ -37,7 +37,7 @@ func (r *BaseRepository[T]) getEntityName() string {
 func (r *BaseRepository[T]) Create(ctx context.Context, entity T) error {
 	entityName := r.getEntityName()
 
-	// Validate entity if it implements Validator interface
+	// any()先将泛型转为interface{},再判断泛型entity是否实现了 Validator 接口
 	if validator, ok := any(entity).(model.Validator); ok {
 		if err := validator.Validate(); err != nil {
 			r.logger.WithError(err).WithField("entity", entityName).Error("Entity validation failed")

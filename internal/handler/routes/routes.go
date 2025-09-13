@@ -109,7 +109,7 @@ func (rm *RouteManager) registerHealthRoutes(router *gin.Engine) {
 		health.GET("/ready", rm.healthHandler.Readiness)
 		health.GET("/live", rm.healthHandler.Liveness)
 	}
-	// Backward compatible simple endpoint
+	// 为了同时兼容 /health/ 和 /health 两种写法
 	router.GET("/health", rm.healthHandler.Health)
 }
 
@@ -117,6 +117,7 @@ func (rm *RouteManager) registerHealthRoutes(router *gin.Engine) {
 func (rm *RouteManager) registerAPIRoutes(router *gin.Engine) {
 	api := router.Group("/api")
 	{
+		//版本控制点，便于未来并行提供 /v2、灰度发布、逐步迁移。
 		v1 := api.Group("/v1")
 		{
 			// Welcome endpoint
@@ -167,10 +168,12 @@ func (rm *RouteManager) registerDocumentationRoutes(router *gin.Engine) {
 
 	// Swagger UI 路由（为 swagger 放宽 CSP）
 	swaggerGroup := router.Group("/swagger")
+	//设置宽松的 CSP 策略, 允许内联样式和脚本,确保Swagger UI 能够正常加载和运行
 	swaggerGroup.Use(func(c *gin.Context) {
 		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'self';")
 		c.Next()
 	})
+	//将所有对 /swagger/* 路径的 GET 请求都交给 Swagger UI 的静态文件处理器来处理，从而提供完整的 API 文档界面
 	swaggerGroup.GET("/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// /docs 重定向到 Swagger UI
