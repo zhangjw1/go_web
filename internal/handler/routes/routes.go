@@ -57,47 +57,56 @@ func (rm *RouteManager) SetUserHandler(userHandler *handler.UserHandler) {
 	rm.userHandler = userHandler
 }
 
-// RegisterRoutes registers all application routes
+// RegisterRoutes 注册所有应用程序路由
+// 该方法负责配置中间件并注册健康检查、API接口、文档和静态文件等所有路由
+//
+// 参数:
+//   - router: *gin.Engine - Gin路由器实例，用于注册所有路由
 func (rm *RouteManager) RegisterRoutes(router *gin.Engine) {
-	// Setup global middleware
+	// 设置全局中间件
 	rm.setupMiddleware(router)
 
-	// Health check routes (no middleware needed)
+	// 注册健康检查路由（不需要中间件）
 	rm.registerHealthRoutes(router)
 
-	// API routes
+	// 注册API路由
 	rm.registerAPIRoutes(router)
 
-	// Documentation routes
+	// 注册文档路由
 	rm.registerDocumentationRoutes(router)
 
-	// Static file routes (if needed)
+	// 注册静态文件路由（如需要）
 	rm.registerStaticRoutes(router)
 
-	rm.logger.Info("All routes registered successfully")
+	rm.logger.Info("所有路由注册成功")
 }
 
-// setupMiddleware sets up global middleware
+// setupMiddleware 设置全局中间件
+// 为Gin路由器配置必要的中间件组件，包括恢复、日志、CORS、请求ID生成、
+// 响应时间跟踪和安全头部等核心功能
+//
+// 参数:
+//   - router: *gin.Engine - 需要配置中间件的Gin路由器引擎
 func (rm *RouteManager) setupMiddleware(router *gin.Engine) {
-	// Recovery middleware
+	// 恢复中间件 - 捕获并处理panic，防止服务器崩溃
 	router.Use(gin.Recovery())
 
-	// Logger middleware
+	// 日志中间件 - 记录每个请求的详细信息
 	router.Use(middleware.LoggerMiddleware(rm.logger))
 
-	// CORS middleware
+	// CORS中间件 - 处理跨域资源共享
 	router.Use(middleware.CORSMiddleware())
 
-	// Request ID middleware
+	// 请求ID中间件 - 为每个请求生成唯一标识符
 	router.Use(middleware.RequestIDMiddleware())
 
-	// Response time middleware
+	// 响应时间中间件 - 记录和追踪API响应时间
 	router.Use(middleware.ResponseTimeMiddleware())
 
-	// Security headers middleware
+	// 安全头部中间件 - 添加安全相关的HTTP头部
 	router.Use(middleware.SecurityHeadersMiddleware())
 
-	rm.logger.Info("Global middleware configured")
+	rm.logger.Info("全局中间件配置完成")
 }
 
 // registerHealthRoutes registers health check routes

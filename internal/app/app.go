@@ -325,71 +325,82 @@ func (a *App) publishSystemStartup() error {
 	return a.msgSvc.SendJSONMessage(messaging.TopicSystemEvents, "system", env)
 }
 
-// waitForShutdown waits for shutdown signal and performs graceful shutdown
+// waitForShutdown 等待系统关闭信号并执行优雅关闭
+// 该函数会监听 SIGINT 和 SIGTERM 信号，收到信号后执行应用程序的关闭流程
+// 返回值: error - 关闭过程中可能产生的错误
 func (a *App) waitForShutdown() error {
 	// Create channel to receive OS signals
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	// Wait for signal
+	// 等待中断信号
 	sig := <-quit
 	a.logger.WithField("signal", sig.String()).Info("Shutdown signal received")
 
-	// Perform graceful shutdown
+	// 关闭服务
 	return a.shutdown()
 }
 
-// shutdown performs graceful shutdown of all components
+// shutdown 执行应用程序的优雅关闭流程
+// 按照特定顺序关闭各种服务和资源：
+// 1. 发布系统关闭事件
+// 2. 关闭HTTP服务器
+// 3. 关闭消息服务
+// 4. 关闭缓存
+// 5. 关闭数据库连接
+//
+// 返回值:
+//   - error: 始终返回nil，因为不传播关键错误
 func (a *App) shutdown() error {
-	a.logger.Info("Starting graceful shutdown...")
+	a.logger.Info("开始执行优雅关闭...")
 
-	// Create shutdown context with timeout
+	// 创建带超时的关闭上下文
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Publish system shutdown event
+	// 发布系统关闭事件
 	if a.msgSvc != nil {
 		_ = a.msgSvc.SendJSONMessage(messaging.TopicSystemEvents, "system", messaging.NewEnvelopedMessage(messaging.EventSystemShutdown, "go-web-starter", nil))
 	}
 
-	// Shutdown HTTP server
+	// 关闭HTTP服务器
 	if a.server != nil {
-		a.logger.Info("Shutting down HTTP server...")
+		a.logger.Info("正在关闭HTTP服务器...")
 		if err := a.server.Shutdown(ctx); err != nil {
-			a.logger.WithError(err).Error("Failed to shutdown HTTP server gracefully")
+			a.logger.WithError(err).Error("无法优雅关闭HTTP服务器")
 		} else {
-			a.logger.Info("HTTP server shutdown completed")
+			a.logger.Info("HTTP服务器关闭完成")
 		}
 	}
 
-	// Close messaging (Kafka client inside service)
+	// 关闭消息服务（内部包含Kafka客户端）
 	if a.msgSvc != nil {
 		if err := a.msgSvc.Close(); err != nil {
-			a.logger.WithError(err).Error("Failed to close messaging service")
+			a.logger.WithError(err).Error("无法关闭消息服务")
 		} else {
-			a.logger.Info("Messaging service closed")
+			a.logger.Info("消息服务已关闭")
 		}
 	}
 
-	// Close cache
+	// 关闭缓存
 	if a.cache != nil {
 		if err := a.cache.Close(); err != nil {
-			a.logger.WithError(err).Error("Failed to close cache")
+			a.logger.WithError(err).Error("无法关闭缓存")
 		} else {
-			a.logger.Info("Cache closed")
+			a.logger.Info("缓存已关闭")
 		}
 	}
 
-	// Close database
+	// 关闭数据库
 	if a.db != nil {
 		if err := a.db.Close(); err != nil {
-			a.logger.WithError(err).Error("Failed to close database")
+			a.logger.WithError(err).Error("无法关闭数据库")
 		} else {
-			a.logger.Info("Database closed")
+			a.logger.Info("数据库已关闭")
 		}
 	}
 
-	a.logger.Info("Graceful shutdown completed")
+	a.logger.Info("优雅关闭完成")
 	return nil
 }
 
