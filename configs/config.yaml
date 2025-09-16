@@ -36,3 +36,9 @@ logger:
   max_backups: 3
   max_age: 28
   compress: true
+
+blockchain:
+  enabled: true
+  network_url: "https://sepolia.infura.io/v3/efe70fa30ffd4eb08d17e189753d80b9"
+  network_name: "ethereum"
+  timeout: 30

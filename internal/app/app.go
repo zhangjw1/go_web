@@ -216,11 +216,24 @@ func (a *App) initHTTPServer() error {
 		userRepo := repository.NewUserRepository(a.db.DB, a.logger)
 		userHandler = handler.NewUserHandler(userRepo, a.config, a.logger)
 	}
+
+	// 创建区块链处理器（如果区块链功能启用）
+	var blockchainHandler *handler.BlockChainHandler
+	if a.config.Blockchain.Enabled {
+		var err error
+		blockchainHandler, err = handler.NewBlockChainHandler(a.config, a.logger, a.db, a.cache, a.msgSvc)
+		if err != nil {
+			a.logger.WithError(err).Warn("Failed to initialize blockchain handler, continuing without blockchain functionality")
+			blockchainHandler = nil
+		}
+	}
+
 	a.routeManager = routes.NewRouteManager(
 		a.config,
 		a.logger,
 		healthHandler,
 		userHandler,
+		blockchainHandler,
 	)
 
 	// 注册所有路由

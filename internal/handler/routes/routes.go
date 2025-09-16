@@ -21,8 +21,9 @@ type RouteManager struct {
 	logger *logger.Logger
 
 	// Handlers
-	healthHandler *handler.HealthHandler
-	userHandler   *handler.UserHandler
+	healthHandler     *handler.HealthHandler
+	userHandler       *handler.UserHandler
+	blockchainHandler *handler.BlockChainHandler
 }
 
 // NewRouteManager creates a new route manager with all dependencies
@@ -31,12 +32,14 @@ func NewRouteManager(
 	log *logger.Logger,
 	healthHandler *handler.HealthHandler,
 	userHandler *handler.UserHandler,
+	blockchainHandler *handler.BlockChainHandler,
 ) *RouteManager {
 	rm := &RouteManager{
-		config:        cfg,
-		logger:        log,
-		healthHandler: healthHandler,
-		userHandler:   userHandler,
+		config:            cfg,
+		logger:            log,
+		healthHandler:     healthHandler,
+		userHandler:       userHandler,
+		blockchainHandler: blockchainHandler,
 	}
 
 	// Initialize handlers if not provided
@@ -145,6 +148,11 @@ func (rm *RouteManager) registerAPIRoutes(router *gin.Engine) {
 			if rm.userHandler != nil {
 				rm.registerUserRoutes(v1)
 			}
+
+			// Blockchain routes (only if blockchain handler is available)
+			if rm.blockchainHandler != nil {
+				rm.registerBlockchainRoutes(v1)
+			}
 		}
 	}
 }
@@ -160,6 +168,24 @@ func (rm *RouteManager) registerUserRoutes(v1 *gin.RouterGroup) {
 		users.DELETE("/:id", rm.userHandler.DeleteUser)
 		users.GET("/username/:username", rm.userHandler.GetUserByUsername)
 		users.PUT("/:id/password", rm.userHandler.ChangePassword)
+	}
+}
+
+// registerBlockchainRoutes registers blockchain-related routes
+func (rm *RouteManager) registerBlockchainRoutes(v1 *gin.RouterGroup) {
+	blockchain := v1.Group("/blockchain")
+	{
+		// 获取最新区块号
+		blockchain.GET("/block/latest", rm.blockchainHandler.GetLatestBlockNumber)
+
+		// 根据区块号获取区块信息
+		blockchain.GET("/block/:number", rm.blockchainHandler.GetBlockByNumber)
+
+		// 根据交易哈希获取交易信息
+		blockchain.GET("/transaction/:hash", rm.blockchainHandler.GetTransactionByHash)
+
+		// 获取地址余额
+		blockchain.GET("/balance/:address", rm.blockchainHandler.GetBalance)
 	}
 }
 

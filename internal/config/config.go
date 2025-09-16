@@ -10,11 +10,12 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Redis    RedisConfig    `mapstructure:"redis"`
-	Kafka    KafkaConfig    `mapstructure:"kafka"`
-	Logger   LoggerConfig   `mapstructure:"logger"`
+	Server     ServerConfig     `mapstructure:"server"`
+	Database   DatabaseConfig   `mapstructure:"database"`
+	Redis      RedisConfig      `mapstructure:"redis"`
+	Kafka      KafkaConfig      `mapstructure:"kafka"`
+	Logger     LoggerConfig     `mapstructure:"logger"`
+	Blockchain BlockchainConfig `mapstructure:"blockchain"`
 }
 
 // ServerConfig holds server configuration
@@ -66,6 +67,14 @@ type LoggerConfig struct {
 	MaxBackups int    `mapstructure:"max_backups"`
 	MaxAge     int    `mapstructure:"max_age"`
 	Compress   bool   `mapstructure:"compress"`
+}
+
+// BlockchainConfig holds blockchain configuration
+type BlockchainConfig struct {
+	Enabled     bool   `mapstructure:"enabled"`
+	NetworkURL  string `mapstructure:"network_url"`
+	NetworkName string `mapstructure:"network_name"`
+	Timeout     int    `mapstructure:"timeout"`
 }
 
 // Load loads configuration from file and environment variables
@@ -159,6 +168,12 @@ func setDefaults() {
 	viper.SetDefault("logger.max_backups", 3)
 	viper.SetDefault("logger.max_age", 28)
 	viper.SetDefault("logger.compress", true)
+
+	// Blockchain defaults
+	viper.SetDefault("blockchain.enabled", true)
+	viper.SetDefault("blockchain.network_url", "https://mainnet.infura.io/v3/YOUR_PROJECT_ID")
+	viper.SetDefault("blockchain.network_name", "ethereum")
+	viper.SetDefault("blockchain.timeout", 30)
 }
 
 // validate validates the configuration
@@ -224,6 +239,16 @@ func validate(config *Config) error {
 	}
 	if !validFormat {
 		return fmt.Errorf("logger format must be one of: %s", strings.Join(validFormats, ", "))
+	}
+
+	// Validate blockchain config (only when enabled)
+	if config.Blockchain.Enabled {
+		if config.Blockchain.NetworkURL == "" {
+			return fmt.Errorf("blockchain network URL is required")
+		}
+		if config.Blockchain.NetworkName == "" {
+			return fmt.Errorf("blockchain network name is required")
+		}
 	}
 
 	return nil
