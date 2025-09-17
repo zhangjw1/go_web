@@ -4,20 +4,21 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"go-web-starter/internal/config"
 	"go-web-starter/internal/infrastructure/cache"
 	"go-web-starter/internal/infrastructure/database"
 	"go-web-starter/internal/infrastructure/logger"
 	"go-web-starter/internal/infrastructure/messaging"
-	"golang.org/x/crypto/sha3"
 	"log"
 	"math/big"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -62,11 +63,13 @@ func NewBlockChainHandler(cfg *config.Config, log *logger.Logger, db *database.D
 
 // GetLatestBlockNumber 获取最新区块号
 // @Summary 获取最新区块号
-// @Description 获取最新区块号
-// @Tags Blockchain
+// @Description 获取以太坊网络的最新区块号
+// @Tags blockchain
 // @Produce json
-// @Success 200 {object}
-// @Router /blockchain/latest
+// @Success 200 {object} map[string]interface{} "成功返回最新区块号与网络信息"
+// @Failure 503 {object} map[string]interface{} "区块链服务未启用"
+// @Failure 500 {object} map[string]interface{} "获取区块号失败"
+// @Router /api/v1/blockchain/block/latest [get]
 func (h *BlockChainHandler) GetLatestBlockNumber(c *gin.Context) {
 	if !h.config.Blockchain.Enabled {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -96,12 +99,15 @@ func (h *BlockChainHandler) GetLatestBlockNumber(c *gin.Context) {
 
 // GetBlockByNumber 根据区块号获取区块信息
 // @Summary 获取区块信息
-// @Description 获取区块信息
-// @Tags Blockchain
+// @Description 通过区块号获取指定区块的基础信息
+// @Tags blockchain
 // @Produce json
-// @Param number path string true "Block number"
-// @Success 200 {object}
-// @Router /blockchain/block/{number}
+// @Param number path integer true "区块号"
+// @Success 200 {object} map[string]interface{} "成功返回区块信息"
+// @Failure 400 {object} map[string]interface{} "区块号格式错误"
+// @Failure 503 {object} map[string]interface{} "区块链服务未启用"
+// @Failure 500 {object} map[string]interface{} "获取区块信息失败"
+// @Router /api/v1/blockchain/block/{number} [get]
 func (h *BlockChainHandler) GetBlockByNumber(c *gin.Context) {
 	if !h.config.Blockchain.Enabled {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -153,6 +159,16 @@ func (h *BlockChainHandler) GetBlockByNumber(c *gin.Context) {
 }
 
 // GetTransactionByHash 根据交易哈希获取交易信息
+// @Summary 获取交易信息
+// @Description 通过交易哈希获取交易与收据信息
+// @Tags blockchain
+// @Produce json
+// @Param hash path string true "交易哈希(0x开头的66位)"
+// @Success 200 {object} map[string]interface{} "成功返回交易信息"
+// @Failure 400 {object} map[string]interface{} "交易哈希格式错误"
+// @Failure 503 {object} map[string]interface{} "区块链服务未启用"
+// @Failure 500 {object} map[string]interface{} "获取交易信息失败"
+// @Router /api/v1/blockchain/transaction/{hash} [get]
 func (h *BlockChainHandler) GetTransactionByHash(c *gin.Context) {
 	if !h.config.Blockchain.Enabled {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -234,6 +250,16 @@ func (h *BlockChainHandler) GetTransactionByHash(c *gin.Context) {
 }
 
 // GetBalance 获取地址余额
+// @Summary 获取地址余额
+// @Description 获取地址在当前网络的余额(ETH)
+// @Tags blockchain
+// @Produce json
+// @Param address path string true "以太坊地址"
+// @Success 200 {object} map[string]interface{} "成功返回余额(ETH)"
+// @Failure 400 {object} map[string]interface{} "地址格式错误"
+// @Failure 503 {object} map[string]interface{} "区块链服务未启用"
+// @Failure 500 {object} map[string]interface{} "获取余额失败"
+// @Router /api/v1/blockchain/balance/{address} [get]
 func (h *BlockChainHandler) GetBalance(c *gin.Context) {
 	if !h.config.Blockchain.Enabled {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -271,6 +297,13 @@ func (h *BlockChainHandler) GetBalance(c *gin.Context) {
 	})
 }
 
+// GenerateWallet 生成新钱包(私钥/公钥/地址)
+// @Summary 生成钱包
+// @Description 生成新的椭圆曲线密钥对以及对应地址
+// @Tags blockchain
+// @Produce json
+// @Success 200 {object} map[string]interface{} "成功返回私钥、公钥与地址"
+// @Router /api/v1/blockchain/wallet/create [get]
 func (h *BlockChainHandler) GenerateWallet(c *gin.Context) {
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -323,7 +356,17 @@ func (h *BlockChainHandler) GenerateWallet(c *gin.Context) {
 	})
 }
 
-// 转账ETH
+// TransferEther 转账ETH
+// @Summary 转账 ETH
+// @Description 使用私钥从对应地址向目标地址发起一笔ETH转账
+// @Tags blockchain
+// @Produce json
+// @Param privateKey path string true "十六进制私钥(不含0x)"
+// @Param toAddress path string true "接收方以太坊地址"
+// @Success 200 {object} map[string]interface{} "成功返回交易哈希等信息"
+// @Failure 400 {object} map[string]interface{} "参数错误"
+// @Failure 500 {object} map[string]interface{} "签名或发送交易失败"
+// @Router /api/v1/blockchain/transfer/{privateKey}/{toAddress} [get]
 func (h *BlockChainHandler) TransferEther(c *gin.Context) {
 	privateKeyStr := c.Param("privateKey")
 	if privateKeyStr == "" {
