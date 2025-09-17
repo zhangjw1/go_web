@@ -2,12 +2,18 @@ package handler
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"go-web-starter/internal/config"
 	"go-web-starter/internal/infrastructure/cache"
 	"go-web-starter/internal/infrastructure/database"
 	"go-web-starter/internal/infrastructure/logger"
 	"go-web-starter/internal/infrastructure/messaging"
+	"golang.org/x/crypto/sha3"
+	"log"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -125,6 +131,10 @@ func (h *BlockChainHandler) GetBlockByNumber(c *gin.Context) {
 		return
 	}
 
+	for _, tx := range block.Transactions() {
+		h.logger.Info("Retrieved transaction information", "txHash", tx.Hash().Hex())
+	}
+
 	blockInfo := gin.H{
 		"number":       block.Number().Uint64(),
 		"hash":         block.Hash().Hex(),
@@ -172,6 +182,23 @@ func (h *BlockChainHandler) GetTransactionByHash(c *gin.Context) {
 		return
 	}
 
+	chainID, err := h.client.NetworkID(context.Background())
+
+	var signer types.Signer
+	switch tx.Type() {
+	case types.LegacyTxType:
+		signer = types.NewEIP155Signer(chainID)
+	case types.AccessListTxType:
+		signer = types.NewEIP2930Signer(chainID)
+	case types.DynamicFeeTxType:
+		signer = types.NewLondonSigner(chainID)
+	default:
+		fmt.Errorf("unsupported transaction type: %d", tx.Type())
+	}
+	fmt.Printf("tx.Type(): %v\n", tx.Type())
+
+	sender, err := types.Sender(signer, tx)
+
 	// 获取交易收据
 	receipt, err := h.client.TransactionReceipt(ctx, hash)
 	if err != nil {
@@ -179,9 +206,10 @@ func (h *BlockChainHandler) GetTransactionByHash(c *gin.Context) {
 	}
 
 	txInfo := gin.H{
+		"sender":   sender.Hex(),
 		"hash":     tx.Hash().Hex(),
 		"nonce":    tx.Nonce(),
-		"to":       "",
+		"to":       tx.To().Hex(),
 		"value":    tx.Value().String(),
 		"gasLimit": tx.Gas(),
 		"gasPrice": tx.GasPrice().String(),
@@ -238,7 +266,134 @@ func (h *BlockChainHandler) GetBalance(c *gin.Context) {
 	h.logger.Info("Retrieved balance", "address", address, "balance", balance.String())
 	c.JSON(http.StatusOK, gin.H{
 		"address": address,
-		"balance": balance.String(),
+		"balance": weiToEther(balance),
 		"network": h.config.Blockchain.NetworkName,
 	})
+}
+
+func (h *BlockChainHandler) GenerateWallet(c *gin.Context) {
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to generate private key",
+		})
+		return
+	}
+
+	//私钥字节
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+	//转成十六进制字符串，并删除前缀0x(这就是用于签署交易的私钥)
+	s := hexutil.Encode(privateKeyBytes)[2:]
+	fmt.Printf("Private key: %s\n", s)
+
+	//生成对应的公钥
+	publicKey := privateKey.Public()
+	//publicKeyECDSA 是一个 ECDSA（椭圆曲线数字签名算法）公钥的 Go 语言表示
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to generate public key",
+		})
+		return
+	}
+
+	/*
+		当使用 crypto.FromECDSAPub() 将 ECDSA 公钥转换为字节时，它会返回一个 65 字节的数组，其中：
+		第1个字节（索引0）是前缀 0x04，表示这是一个未压缩的公钥格式
+		接下来的32字节是公钥的 X 坐标
+		最后的32字节是公钥的 Y 坐标
+	*/
+	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
+	publicKetStr := hexutil.Encode(publicKeyBytes)[4:]
+	fmt.Println("from pubKey:", publicKetStr) // 去掉'0x04'
+
+	//通过公钥生成对应的 地址
+	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
+	fmt.Printf("Address: %s\n", address)
+
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(publicKeyBytes[1:])
+	fmt.Println(hexutil.Encode(hash.Sum(nil)[12:]))
+
+	c.JSON(http.StatusOK, gin.H{
+		"privateKey": s,
+		"publicKey":  publicKetStr,
+		"address":    address,
+	})
+}
+
+// 转账ETH
+func (h *BlockChainHandler) TransferEther(c *gin.Context) {
+	privateKeyStr := c.Param("privateKey")
+	if privateKeyStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{})
+		return
+	}
+
+	//加载私钥，生成对应的 *ecdsa.PrivateKey对象
+	privateKey, err := crypto.HexToECDSA(privateKeyStr)
+	if err != nil {
+		h.logger.Error("Failed to convert private key", "error", err)
+	}
+
+	//生成公钥信息
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		h.logger.Fatal("cannot assert type: publicKey is not of type *ecdsa.PublicKey")
+	}
+
+	//公钥生成地址
+	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+	//获取nonce
+	nonce, err := h.client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		h.logger.Error("Failed to get nonce", "error", err)
+	}
+
+	gwei := big.NewInt(1000000000000000)
+	gasLimit := uint64(21000)
+	gasPrice, err := h.client.SuggestGasPrice(context.Background())
+	if err != nil {
+		h.logger.Error("Failed to get gas price", "error", err)
+	}
+
+	params := c.Param("toAddress")
+	toAddress := common.HexToAddress(params)
+
+	var data []byte
+	transaction := types.NewTransaction(nonce, toAddress, gwei, gasLimit, gasPrice, data)
+
+	chainID, err := h.client.NetworkID(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	signedTx, err := types.SignTx(transaction, types.NewEIP155Signer(chainID), privateKey)
+
+	if err != nil {
+		h.logger.Error("Failed to sign transaction", "error", err)
+	}
+
+	err = h.client.SendTransaction(context.Background(), signedTx)
+	if err != nil {
+		h.logger.Error("Failed to send transaction", "error", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"txHash":   signedTx.Hash().Hex(),
+		"network":  h.config.Blockchain.NetworkName,
+		"from":     fromAddress.Hex(),
+		"to":       toAddress.Hex(),
+		"value":    weiToEther(gwei),
+		"gasLimit": gasLimit,
+	})
+}
+
+func weiToEther(wei *big.Int) *big.Float {
+	weiPerEth := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
+	weiFloat := new(big.Float).SetInt(wei)
+	ethValue := new(big.Float).Quo(weiFloat, new(big.Float).SetInt(weiPerEth))
+	return ethValue
 }

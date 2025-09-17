@@ -186,6 +186,8 @@ func (rm *RouteManager) registerBlockchainRoutes(v1 *gin.RouterGroup) {
 
 		// 获取地址余额
 		blockchain.GET("/balance/:address", rm.blockchainHandler.GetBalance)
+		blockchain.GET("/wallet/create", rm.blockchainHandler.GenerateWallet)
+		blockchain.GET("/transfer/:privateKey/:toAddress", rm.blockchainHandler.TransferEther)
 	}
 }
 
