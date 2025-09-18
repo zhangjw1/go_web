@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -434,9 +436,306 @@ func (h *BlockChainHandler) TransferEther(c *gin.Context) {
 	})
 }
 
+// TransferToken 转账ERC20
+// @Summary 转账 TOKEN
+// @Description 使用私钥从对应地址向目标地址发起一笔ERC20转账
+// @Tags blockchain
+// @Produce json
+// @Param privateKey path string true "十六进制私钥(不含0x)"
+// @Param toAddress path string true "接收方以太坊地址"
+// @Param tokenAddress path string true "ERC20代币合约地址"
+// @Param amount path string true "转账数量"
+// @Success 200 {object} map[string]interface{} "成功返回交易哈希等信息"
+// @Failure 400 {object} map[string]interface{} "参数错误"
+// @Failure 500 {object} map[string]interface{} "签名或发送交易失败"
+// @Router /api/v1/blockchain/transfer-token/{privateKey}/{toAddress}/{tokenAddress}/{amount} [get]
+func (h *BlockChainHandler) TransferToken(c *gin.Context) {
+
+	//获取私钥参数
+	privateKeyStr := c.Param("privateKey")
+	if privateKeyStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Missing private key",
+		})
+		return
+	}
+
+	//获取接收地址参数
+	toAddressStr := c.Param("toAddress")
+	if toAddressStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Missing to address",
+		})
+		return
+	}
+
+	//获取代币地址参数
+	tokenAddressStr := c.Param("tokenAddress")
+	if tokenAddressStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Missing token address",
+		})
+		return
+	}
+
+	//获取token数量参数
+	amountStr := c.Param("amount")
+	if amountStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Missing amount",
+		})
+		return
+	}
+
+	// 解析金额（假设传入的是代币数量，需要转换为最小单位）
+	amount, ok := new(big.Int).SetString(amountStr, 10)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid amount format",
+		})
+		return
+	}
+
+	// 转换为代币的最小单位（假设18位小数）
+	decimals := big.NewInt(18)
+	multiplier := new(big.Int).Exp(big.NewInt(10), decimals, nil)
+	amountInWei := new(big.Int).Mul(amount, multiplier)
+
+	privateKey, err := crypto.HexToECDSA(privateKeyStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to convert private key",
+		})
+		return
+	}
+	//通过私钥解析对应的发送方地址
+	fromAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
+
+	//获取nonce
+	nonce, err := h.client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to get nonce",
+		})
+	}
+
+	//ETH发送值
+	value := big.NewInt(0)
+
+	//获取gas价格
+	gasPrice, err := h.client.SuggestGasPrice(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to get gas price",
+		})
+	}
+
+	tokenAddress := common.HexToAddress(tokenAddressStr)
+	toAddress := common.HexToAddress(toAddressStr)
+
+	//定义调用合约的方法
+	transferFnSignature := []byte("transfer(address,uint256)")
+	//计算签名函数的Keccak-256哈希，并取前4个字节作为函数选择器
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(transferFnSignature)
+	//这个method ID用于在智能合约中识别要调用的具体函数
+	methodID := hash.Sum(nil)[:4]
+	fmt.Printf("methodID: %x\n", hexutil.Encode(methodID))
+	//将接收方地址和金额转换为32字节的十六进制字符串(左边补充0)
+	paddedAddress := common.LeftPadBytes(toAddress.Bytes(), 32)
+	fmt.Printf("paddedAddress: %x\n", hexutil.Encode(paddedAddress))
+	//将金额转换为32字节的十六进制字符串(左边补充0)
+	paddedAmount := common.LeftPadBytes(amountInWei.Bytes(), 32)
+	fmt.Printf("paddedAmount: %x\n", hexutil.Encode(paddedAmount))
+	//data就是发送给ERC20合约的完整交易数据，格式符合以太坊ABI编码规范。这是调用智能合约函数的标准方式
+	data := append(methodID, paddedAddress...)
+	data = append(data, paddedAmount...)
+
+	//通过合约的执行需求计算大致的gas费用
+	gasLimit, err := h.client.EstimateGas(context.Background(), ethereum.CallMsg{
+		To:   &toAddress,
+		Data: data,
+	})
+	fmt.Printf("gasLimit: %d\n", gasLimit)
+
+	//发起一笔交易
+	transaction := types.NewTransaction(nonce, tokenAddress, value, gasLimit, gasPrice, data)
+	chainID, err := h.client.NetworkID(context.Background())
+	if err != nil {
+		h.logger.Error("Failed to get network ID", "error", err)
+	}
+
+	//使用私钥对交易签名
+	signedTx, err := types.SignTx(transaction, types.NewEIP155Signer(chainID), privateKey)
+
+	if err != nil {
+		h.logger.Error("Failed to sign transaction", "error", err)
+	}
+
+	//发送交易
+	err = h.client.SendTransaction(context.Background(), signedTx)
+	if err != nil {
+		h.logger.Error("Failed to send transaction", "error", err)
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"txHash":          signedTx.Hash().Hex(),
+		"network":         h.config.Blockchain.NetworkName,
+		"from":            fromAddress.Hex(),
+		"to":              toAddress.Hex(),
+		"value":           weiToEther(value),
+		"gasLimit":        gasLimit,
+		"tokenAddress":    tokenAddress.Hex(),
+		"amount":          amount.String(),
+		"amountFormatted": formatTokenBalance(amountInWei),
+		"status":          "success",
+	})
+
+}
+
+// GetTokenBalance 获取ERC20代币余额
+// @Summary 获取ERC20代币余额
+// @Description 查询指定地址在指定ERC20代币合约中的余额
+// @Tags blockchain
+// @Produce json
+// @Param address path string true "钱包地址"
+// @Param tokenAddress path string true "ERC20代币合约地址"
+// @Success 200 {object} map[string]interface{} "成功返回代币余额信息"
+// @Failure 400 {object} map[string]interface{} "参数格式错误"
+// @Failure 503 {object} map[string]interface{} "区块链服务未启用"
+// @Failure 500 {object} map[string]interface{} "查询余额失败"
+// @Router /api/v1/blockchain/token-balance/{address}/{tokenAddress} [get]
+func (h *BlockChainHandler) GetTokenBalance(c *gin.Context) {
+	if !h.config.Blockchain.Enabled {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "Blockchain service is disabled",
+		})
+		return
+	}
+
+	// 获取钱包地址参数
+	addressStr := c.Param("address")
+	if addressStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Missing wallet address",
+		})
+		return
+	}
+
+	// 获取代币合约地址参数
+	tokenAddressStr := c.Param("tokenAddress")
+	if tokenAddressStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Missing token address",
+		})
+		return
+	}
+
+	// 验证地址格式
+	if !common.IsHexAddress(addressStr) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid wallet address format",
+		})
+		return
+	}
+
+	if !common.IsHexAddress(tokenAddressStr) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid token address format",
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(h.config.Blockchain.Timeout)*time.Second)
+	defer cancel()
+
+	// 转换为地址类型
+	walletAddress := common.HexToAddress(addressStr)
+	tokenAddress := common.HexToAddress(tokenAddressStr)
+
+	// 构建ERC20 balanceOf函数调用数据
+	// balanceOf(address) 的函数选择器
+	balanceOfSignature := []byte("balanceOf(address)")
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(balanceOfSignature)
+	methodID := hash.Sum(nil)[:4]
+
+	// 将钱包地址填充为32字节
+	paddedAddress := common.LeftPadBytes(walletAddress.Bytes(), 32)
+
+	// 组合调用数据
+	data := append(methodID, paddedAddress...)
+
+	// 调用合约
+	result, err := h.client.CallContract(ctx, ethereum.CallMsg{
+		To:   &tokenAddress,
+		Data: data,
+	}, nil)
+	if err != nil {
+		h.logger.Error("Failed to call token contract", "error", err, "address", addressStr, "tokenAddress", tokenAddressStr)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to query token balance",
+		})
+		return
+	}
+
+	// 解析余额结果（32字节大端序）
+	balance := new(big.Int).SetBytes(result)
+
+	h.logger.Info("Retrieved token balance", "address", addressStr, "tokenAddress", tokenAddressStr, "balance", balance.String())
+
+	c.JSON(http.StatusOK, gin.H{
+		"address":          addressStr,
+		"tokenAddress":     tokenAddressStr,
+		"balance":          balance.String(),
+		"balanceFormatted": formatTokenBalance(balance),
+		"network":          h.config.Blockchain.NetworkName,
+	})
+}
+
+func (h *BlockChainHandler) SubscribeBlock(c *gin.Context) {
+	headers := make(chan *types.Header)
+	sub, err := h.client.SubscribeNewHead(context.Background(), headers)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		select {
+		case err := <-sub.Err():
+			log.Fatal(err)
+		case header := <-headers:
+			fmt.Println(header.Hash().Hex()) // 0xbc10defa8dda384c96a17640d84de5578804945d347072e091b4e5f390ddea7f
+			block, err := h.client.BlockByHash(context.Background(), header.Hash())
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			fmt.Println(block.Hash().Hex())        // 0xbc10defa8dda384c96a17640d84de5578804945d347072e091b4e5f390ddea7f
+			fmt.Println(block.Number().Uint64())   // 3477413
+			fmt.Println(block.Time())              // 1529525947
+			fmt.Println(block.Nonce())             // 130524141876765836
+			fmt.Println(len(block.Transactions())) // 7
+		}
+	}
+}
+
 func weiToEther(wei *big.Int) *big.Float {
 	weiPerEth := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
 	weiFloat := new(big.Float).SetInt(wei)
 	ethValue := new(big.Float).Quo(weiFloat, new(big.Float).SetInt(weiPerEth))
 	return ethValue
+}
+
+// formatTokenBalance 格式化代币余额，假设代币精度为18位小数
+func formatTokenBalance(balance *big.Int) string {
+	// 大多数ERC20代币使用18位小数，与ETH相同
+	decimals := big.NewInt(18)
+	divisor := new(big.Int).Exp(big.NewInt(10), decimals, nil)
+
+	// 转换为浮点数进行除法运算
+	balanceFloat := new(big.Float).SetInt(balance)
+	divisorFloat := new(big.Float).SetInt(divisor)
+	result := new(big.Float).Quo(balanceFloat, divisorFloat)
+
+	return result.Text('f', 18)
 }

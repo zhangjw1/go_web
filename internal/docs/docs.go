@@ -161,6 +161,64 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/blockchain/token-balance/{address}/{tokenAddress}": {
+            "get": {
+                "description": "查询指定地址在指定ERC20代币合约中的余额",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blockchain"
+                ],
+                "summary": "获取ERC20代币余额",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "钱包地址",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "ERC20代币合约地址",
+                        "name": "tokenAddress",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功返回代币余额信息",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "参数格式错误",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "查询余额失败",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "503": {
+                        "description": "区块链服务未启用",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/blockchain/transaction/{hash}": {
             "get": {
                 "description": "通过交易哈希获取交易与收据信息",
@@ -204,6 +262,71 @@ const docTemplate = `{
                     },
                     "503": {
                         "description": "区块链服务未启用",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/blockchain/transfer-token/{privateKey}/{toAddress}/{tokenAddress}/{amount}": {
+            "get": {
+                "description": "使用私钥从对应地址向目标地址发起一笔ERC20转账",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blockchain"
+                ],
+                "summary": "转账 TOKEN",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "十六进制私钥(不含0x)",
+                        "name": "privateKey",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "接收方以太坊地址",
+                        "name": "toAddress",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "ERC20代币合约地址",
+                        "name": "tokenAddress",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "转账数量",
+                        "name": "amount",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功返回交易哈希等信息",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "参数错误",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "签名或发送交易失败",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
