@@ -161,6 +161,41 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/blockchain/subscribe/block": {
+            "get": {
+                "description": "实时订阅以太坊网络的新区块事件，并输出区块基本信息",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blockchain"
+                ],
+                "summary": "订阅新区块事件",
+                "responses": {
+                    "200": {
+                        "description": "成功订阅并返回区块信息",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "订阅失败",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "503": {
+                        "description": "区块链服务未启用",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/blockchain/token-balance/{address}/{tokenAddress}": {
             "get": {
                 "description": "查询指定地址在指定ERC20代币合约中的余额",

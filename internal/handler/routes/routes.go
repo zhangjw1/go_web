@@ -192,6 +192,9 @@ func (rm *RouteManager) registerBlockchainRoutes(v1 *gin.RouterGroup) {
 		// ERC20代币相关
 		blockchain.GET("/token-balance/:address/:tokenAddress", rm.blockchainHandler.GetTokenBalance)
 		blockchain.GET("/transfer-token/:privateKey/:toAddress/:tokenAddress/:amount", rm.blockchainHandler.TransferToken)
+
+		// 订阅新区块
+		blockchain.GET("/subscribe/block", rm.blockchainHandler.SubscribeBlock)
 	}
 }
 

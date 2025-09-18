@@ -692,29 +692,83 @@ func (h *BlockChainHandler) GetTokenBalance(c *gin.Context) {
 	})
 }
 
+// SubscribeBlock 订阅新区块事件
+// @Summary 订阅新区块事件
+// @Description 实时订阅以太坊网络的新区块事件，并输出区块基本信息
+// @Tags blockchain
+// @Produce json
+// @Success 200 {object} map[string]interface{} "成功订阅并返回区块信息"
+// @Failure 503 {object} map[string]interface{} "区块链服务未启用"
+// @Failure 500 {object} map[string]interface{} "订阅失败"
+// @Router /api/v1/blockchain/subscribe/block [get]
 func (h *BlockChainHandler) SubscribeBlock(c *gin.Context) {
+	if !h.config.Blockchain.Enabled {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "Blockchain service is disabled",
+		})
+		return
+	}
+
 	headers := make(chan *types.Header)
 	sub, err := h.client.SubscribeNewHead(context.Background(), headers)
 	if err != nil {
-		log.Fatal(err)
+		h.logger.Error("Failed to subscribe new head", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to subscribe new block events",
+			"message": "The blockchain node may not support subscription or the connection is not available",
+		})
+		return
 	}
+	defer sub.Unsubscribe()
+
+	// 设置SSE响应头
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Access-Control-Allow-Origin", "*")
+
+	// 发送连接成功的初始消息
+	c.SSEvent("connected", gin.H{
+		"message": "Successfully connected to block subscription",
+		"network": h.config.Blockchain.NetworkName,
+	})
+	c.Writer.Flush()
 
 	for {
 		select {
 		case err := <-sub.Err():
-			log.Fatal(err)
+			h.logger.Error("Subscription error", "error", err)
+			// 通过SSE发送错误信息而不是直接返回JSON
+			c.SSEvent("error", gin.H{
+				"error":   "Subscription error occurred",
+				"message": err.Error(),
+			})
+			return
 		case header := <-headers:
-			fmt.Println(header.Hash().Hex()) // 0xbc10defa8dda384c96a17640d84de5578804945d347072e091b4e5f390ddea7f
 			block, err := h.client.BlockByHash(context.Background(), header.Hash())
 			if err != nil {
-				log.Fatal(err)
+				h.logger.Error("Failed to get block by hash", "error", err, "hash", header.Hash().Hex())
+				// 即使获取区块失败，也继续监听
+				c.SSEvent("error", gin.H{
+					"error":   "Failed to get block by hash",
+					"message": err.Error(),
+					"hash":    header.Hash().Hex(),
+				})
+				c.Writer.Flush()
+				continue
 			}
 
-			fmt.Println(block.Hash().Hex())        // 0xbc10defa8dda384c96a17640d84de5578804945d347072e091b4e5f390ddea7f
-			fmt.Println(block.Number().Uint64())   // 3477413
-			fmt.Println(block.Time())              // 1529525947
-			fmt.Println(block.Nonce())             // 130524141876765836
-			fmt.Println(len(block.Transactions())) // 7
+			blockInfo := gin.H{
+				"hash":         block.Hash().Hex(),
+				"number":       block.Number().Uint64(),
+				"timestamp":    block.Time(),
+				"nonce":        block.Nonce(),
+				"transactions": len(block.Transactions()),
+			}
+
+			h.logger.Info("New block received", "blockInfo", blockInfo)
+			c.SSEvent("block", blockInfo)
+			c.Writer.Flush()
 		}
 	}
 }
