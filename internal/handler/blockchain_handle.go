@@ -773,6 +773,10 @@ func (h *BlockChainHandler) SubscribeBlock(c *gin.Context) {
 	}
 }
 
+func (h *BlockChainHandler) CallContract(c *gin.Context) {
+
+}
+
 func weiToEther(wei *big.Int) *big.Float {
 	weiPerEth := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
 	weiFloat := new(big.Float).SetInt(wei)

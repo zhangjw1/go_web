@@ -5,13 +5,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
-	store "go-web-starter/contract"
-	"log"
-	"math/big"
-	"runtime/debug"
-	"strings"
-	"time"
-
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -19,12 +12,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	store "go-web-starter/contract"
+	"log"
+	"math/big"
+	"runtime/debug"
+	"strings"
+	"time"
 )
-
-func main() {
-	//deployByAbi()
-	deployByEthClient()
-}
 
 func deployByAbi() {
 	client, err := ethclient.Dial("https://sepolia.infura.io/v3/efe70fa30ffd4eb08d17e189753d80b9")
